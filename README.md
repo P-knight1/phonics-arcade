@@ -10,7 +10,7 @@ Voice-controlled reading practice games for people with dyslexia. AI models runn
 ### What it is
 A web app of short reading games that you play **with your voice**. The player reads a word or sound aloud. The backend on the AMD GPU works out which **sounds** they actually said, compares them with the target, and names the mistake (e.g. "b/d swap", "missed a sound"). An adaptive "brain" then picks the next words and writes short personalised stories, so two players get two different experiences.
 
-**Who it's for:** children and adults with dyslexia who want to practise reading, plus the parents, tutors and schools who support them (and would pay for it).
+**Who it's for:** adults with dyslexia who want to practise reading, plus the tutors and support services who work with them (and would pay for it).
 
 **Why it's new:** ordinary speech-to-text "corrects" what you say (you read *bog*, it writes *dog*). Scoring sound by sound with a phoneme model, plus stories generated for each player, wasn't practical before modern AI on large GPUs.
 

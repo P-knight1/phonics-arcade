@@ -30,7 +30,7 @@ Backend API — FastAPI (Python)           ← deployed on the AMD droplet
         └── LLM: open model (e.g. Llama / Qwen) served by vLLM, OpenAI-compatible API
 ```
 
-**Important technical note:** Whisper tends to output the *intended* word, not what was actually said (a child reading "bog" for "dog" may still be transcribed as "dog"). Use Whisper only for general understanding. Use the **phoneme model** for scoring.
+**Important technical note:** Whisper tends to output the *intended* word, not what was actually said (a player reading "bog" for "dog" may still be transcribed as "dog"). Use Whisper only for general understanding. Use the **phoneme model** for scoring.
 
 **Nobody needs ROCm locally.** ROCm lives on the droplet. Everyone (including the Mac user) develops locally and talks to the droplet over HTTP/SSH.
 
@@ -126,7 +126,7 @@ Each game is grounded in established dyslexia research. Do not drift into generi
 | 2 | Backend & Scoring | FastAPI app, mock endpoints, scoring logic (phoneme comparison, error classification), adaptive brain prompts | Mock API pushed and runnable |
 | 3 | Frontend A | Game shell (menus, player select, mic recording), Word Flash, Sound Surgery | Shell + one game playable with placeholder buttons |
 | 4 | Frontend B | Echo Chain, Beat Reader (optional), Progress Dashboard | Echo Chain playable with placeholder buttons |
-| 5 | Content, Research & Pitch | Word lists per phonics level, sound pairs, syllable sequences, LLM prompt templates, research slide, deck, demo script, submission text | Content JSON v1 in `content/` |
+| 5 | Content, Research, QA & Pitch | Word lists per phonics level, sound pairs, syllable sequences, LLM prompt templates, feedback wording, dyslexia-friendly UI guide, evaluation set (labelled clips), daily QA, demo personas, business case, research slide, deck, demo script, submission text, team admin | Content JSON v1, evaluation clips, feedback wording, UI guide, personas (section 8.1) |
 
 ## 8. Timeline
 
@@ -139,6 +139,77 @@ Each game is grounded in established dyslexia research. Do not drift into generi
 | 5 (Sat 17) | Record demo (two different players, game adapting differently). Submit. |
 
 **Fallback:** if speech scoring is unreliable by Thursday night, demo Word Flash with the real mic and keep button input for the others.
+
+### 8.1 Deliverables by day
+
+**Rules:**
+- A deliverable may only need things delivered on an **earlier** day. That's what the "Needs" column shows.
+- Everything is merged to `main` **by the end of its day**, so the next day can rely on it.
+- Three same-day steps are on purpose: the **D1 morning meeting** (that day's work uses its decisions), the **D3 evening fallback decision**, and the **D5 submission** (after that morning's recording).
+- Until real content or models arrive, each person works against what already exists: mock mode, typed answers (`heard_text`), or a few sample items in their own code.
+
+R1 = AI & Infrastructure · R2 = Backend & Scoring · R3 = Frontend A · R4 = Frontend B · R5 = Content, Research & Pitch
+
+**Day 0 — Mon 12 (done)**
+
+| Who | Deliverable | Needs |
+|---|---|---|
+| R2 | Mock API, real scoring + text-to-sound conversion, SQLite progress, adaptive `/next-exercise`, `/story` code, Docker image built and tested, `docs/backend-guide.md` | — |
+
+**Day 1 — Tue 13**
+
+| Who | Deliverable | Needs |
+|---|---|---|
+| All | Join the AMD AI Developer Program. Pull `main` and run the backend locally | — |
+| All | Decisions meeting: the questions in `docs/backend-guide.md` section 7, plus the frontend framework | — |
+| R1 | Droplet up. vLLM answering on localhost with an API key. Backend running on the droplet in Docker. SSH access for the team | Backend image (D0) |
+| R2 | Write the decisions into this file (contract additions, item formats). Help everyone run the backend | Meeting (D1) |
+| R3 | Frontend scaffold + `api.ts`. Shell (player select in localStorage, menu, mic recorder). **Word Flash playable with debug buttons** against mock mode | Mock API (D0), framework (D1 meeting) |
+| R4 | **Echo Chain playable with debug buttons**, built as its own page in the agreed framework, against mock mode, with sample syllables | Mock API (D0), framework (D1 meeting) |
+| R5 | `word_flash.json` v1 (real phonics progression, replaces the starter list). **Evaluation set:** 2+ adult team members record about 30 starter words, read correctly and with deliberate mistakes (bog/dog, dropped sounds), plus `labels.csv` (file, target, what was said, expected `error_type`). Audio stays outside git | Starter list + format (D0) |
+| R5 | **Feedback wording** (`content/feedback.json`: a kind, encouraging message per `error_type`, plus menu and game text, with no medical claims). **Dyslexia-friendly UI guide** (1 page: font, size, spacing, colours, no italics, short instructions). **Two demo personas** (name, weak sounds, interests). **Team admin:** team registered on lablab.ai, everyone in the AMD program, the deadline from the kickoff written into section 12 | Error types (D0), rules (D0) |
+
+**Day 2 — Wed 14**
+
+| Who | Deliverable | Needs |
+|---|---|---|
+| R1 | Phoneme model + Whisper on the droplet. Results on the evaluation clips compared with `g2p.phonemes()`, mismatches sent to R2. **`speech.recognize()` done: real audio scoring live on the droplet.** `/story` checked on the real model | Evaluation clips + labels (D1), vLLM (D1), `speech.py` interface (D0) |
+| R2 | Validate `word_flash.json` v1 in real mode. Build whatever the D1 meeting decided (e.g. a Story Recall answer endpoint, with the transcription faked at a seam like `speech.py`) | Content v1 (D1), decisions (D1) |
+| R3 | Word Flash in real mode locally (levels + progress through typed answers). **Sound Surgery playable with debug buttons** (sample items in the agreed format). Apply the UI guide and feedback wording | Real backend (D0), item format (D1), UI guide + wording (D1) |
+| R4 | Echo Chain merged into the shell. **Progress Dashboard on mock data.** Story Recall screen against mock `/story` (Story Recall had no owner; proposed for R4 because Beat Reader is optional). Apply the UI guide and feedback wording | Shell (D1), mock (D0), UI guide + wording (D1) |
+| R5 | `sound_surgery.json` and `echo_chain.json` (syllables checked with `g2p.phonemes()`), plus syllable audio if decided. **QA of the D1 builds** against the UI guide and wording, with a bug list to R3 and R4 | Formats (D1), D1 builds |
+| R5 | **Business case:** who pays, price, 3–5 competitors, why this wasn't practical before generative AI. Research sources for each game (research slide). Demo storyboard built on the personas. Submission text v1. Cover image v1 (16:9) | Personas (D1), rules (D0) |
+
+**Day 3 — Thu 15 (integration)**
+
+| Who | Deliverable | Needs |
+|---|---|---|
+| R1 | **HTTPS for the droplet API.** Measure GPU seconds per `/score` and per `/story`. Plan for keeping the droplet up during judging. `infra/setup_droplet.sh` | Live scoring (D2) |
+| R2 | Tune `scoring.normalize()` from R1's comparison. Validate the new content files. Make any decided endpoint use real transcription. Fix integration bugs | Comparison + `recognize()` (D2), content (D2) |
+| R3 | **Mic replaces buttons:** Word Flash and Sound Surgery send audio to the droplet (frontend on localhost). Sound Surgery uses real content. Frontend Dockerfile | Live scoring (D2), content (D2) |
+| R4 | Echo Chain with mic + real content. Dashboard on real data from the droplet. Story Recall with real stories | Live scoring + `/story` (D2), content (D2), dashboard (D2) |
+| R5 | **Run the evaluation set** against live scoring: how often the AI agrees with the labels (the quality-control number for the deck). **Story check:** generate stories for both personas on the real model, check reading level and safety, adjust the prompt | Live scoring + `/story` (D2), evaluation set (D1) |
+| R5 | **QA of the D2 builds.** Deck draft with screenshots and the Track 4 answers except cost | D2 builds, business case + storyboard (D2) |
+| All | **The two demo personas each play one short round on the real system**, and again on D4 and D5, so the dashboard shows real progress over 3 days | Live scoring (D2), personas (D1) |
+| All | **Fallback decision tonight:** is mic scoring reliable enough to demo every game? | Integration (D3) |
+
+**Day 4 — Fri 16 (feature freeze in the evening)**
+
+| Who | Deliverable | Needs |
+|---|---|---|
+| R1 | Droplet stable. Judging budget confirmed | Plan (D3) |
+| R2 | Tune level-up/level-down thresholds from real play. Add the frontend to `docker-compose.yml`. Draft the public README | Real play (D3), frontend Dockerfile (D3) |
+| R3 | **Frontend live on Vercel**, calling the HTTPS API. Polish | HTTPS (D3) |
+| R4 | Polish. Beat Reader **only** if everything else is finished | D3 work |
+| R5 | **QA of the integrated D3 build** in the morning, so bugs are fixed before the freeze. Deck final, including **cost per session** and the evaluation result. Demo script final, rehearsed on the build. Submission text final (title ≤ 50 characters, short ≤ 255 characters, long ≥ 100 words) | D3 build, GPU timings + evaluation (D3), deck draft (D3) |
+
+**Day 5 — Sat 17 (submit)**
+
+| Who | Deliverable | Needs |
+|---|---|---|
+| All | Record the demo: two players, the game adapting differently. MP4, ≤ 5 minutes | Frozen app (D4), script (D4) |
+| R2 | Public README final. Clean `docker compose up` from a fresh clone | Frozen app (D4) |
+| R5 | Slides as PDF. Submit on lablab.ai with the repo, live URL, video, deck and cover image | Everything above |
 
 ## 9. Suggested repo structure
 
@@ -206,7 +277,7 @@ Sources: [event page](https://lablab.ai/ai-hackathons/amd-developer-hackathon-ac
 2. What the models generated or decided: phoneme scoring, story generation, and the choice of next exercise.
 3. How we control quality and consistency, e.g. phoneme scoring checked on recorded clips, stories limited to word lists and reading level.
 4. **Cost per generated experience** (GPU-seconds per session × droplet $/hour).
-5. **Who would pay, and why** (schools, tutors, parents).
+5. **Who would pay, and why** (e.g. adult learners, tutors, adult-education and dyslexia support services).
 6. How the experience **changes for at least two audiences or inputs**: our demo with two different players.
 7. Why this wasn't practical before generative AI.
 

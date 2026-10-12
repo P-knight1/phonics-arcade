@@ -19,7 +19,7 @@ The API contract is section 4 of [HANDOFF.md](../HANDOFF.md). Read the **"Propos
 | **Audio → sounds (`speech.py`)** | ❌ **Missing** | AI & Infrastructure. Audio scoring returns `503` until then. |
 | Content for Sound Surgery and Echo Chain | ❌ Missing | Content. |
 | Docker image | ✅ Builds and runs | Tested on Linux x86-64 (WSL): all 34 tests pass in the container. GPU support comes with `speech.py` (section 5). |
-| HTTPS for the API, live URL for judges | ❌ Missing, no owner yet | Required by the rules (HANDOFF.md section 12). |
+| HTTPS for the API, live URL for judges | ❌ Planned | HTTPS: AI & Infrastructure, Day 3. Vercel: Frontend A, Day 4 (HANDOFF.md section 8.1). |
 | Checking spoken Story Recall answers | ❌ Not designed | Needs a team decision (section 7). |
 
 ---
@@ -65,7 +65,7 @@ const result = await (await fetch(`${API_BASE_URL}/score`, { method: "POST", bod
 | Debug "✗ Said it wrong" | `heard_text` = what's typed in the box (no `audio`) |
 | Word disappeared, player said nothing | neither, giving `error_type: "no_response"` |
 
-What to show: `correct`, `heard` ("you said *bog*"), and `error_type` as friendly text, e.g. `letter_reversal` → "b and d are tricky!". Don't show `*_phonemes` to the player: they're IPA symbols.
+What to show: `correct`, `heard` ("you said *bog*"), and `error_type` as friendly text, e.g. `letter_reversal` → "b and d are tricky!". The wording comes from `content/feedback.json` (Content, Day 1). Don't show `*_phonemes` to the player: they're IPA symbols.
 
 ### The round loop (Word Flash)
 ```
@@ -193,4 +193,5 @@ Made-up syllables are read oddly ("ki" → `k aɪ`). Spell them the way they sho
 3. Echo Chain audio: recorded clips, or syllables only?
 4. Story Recall: spoken answers like "it was red" can't be checked by `/score`. Add an endpoint (Whisper + a loose match), or check answers with buttons?
 5. Response time: keep `shown_at_ms` (includes upload time) or measure speech onset in the audio?
-6. Who owns HTTPS and the live URL? Keep the droplet up during judging?
+6. The plan gives HTTPS to AI & Infrastructure (Day 3) and Vercel to Frontend A (Day 4). Agree? Keep the droplet up during judging?
+7. Story Recall has no owner in the roles table. The day-by-day plan (HANDOFF.md section 8.1) gives it to Frontend B, because Beat Reader is optional. Agree?

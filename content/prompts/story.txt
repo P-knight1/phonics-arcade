@@ -1,7 +1,7 @@
-Write a short, cheerful story for a young reader who is practising reading aloud.
+Write a short, cheerful story for a reader who is practising reading aloud.
 
 Rules:
-- 60 to 100 words. Short sentences. Simple, everyday words a child can sound out.
+- 60 to 100 words. Short sentences. Simple, everyday words that are easy to sound out.
 - Use many words that contain these sounds (IPA symbols): $weak_sounds
 - Set the story around these interests: $interests
 - Nothing scary, violent, sad or unkind.
