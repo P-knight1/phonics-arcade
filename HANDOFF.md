@@ -6,7 +6,7 @@
 
 - **Event:** AMD Developer Hackathon: ACT III (lablab.ai). Online build 12–18 October 2026.
 - **Team:** 5 people working in parallel for 5 days (Tue 13 – Sat 17 Oct). Submit on Sat 17 Oct, a day before the deadline.
-- **Track:** Track 4, "Create a New Kind of Experience" (Health & Wellbeing is the fallback).
+- **Track:** Track 4, "Create a New Kind of Experience". (Health & Wellbeing is NOT a good fallback: it is about the patient journey — intake, discharge, records. See section 12.)
 - **One-liner:** A set of voice-controlled reading games for people with dyslexia. The player reads aloud, AI running on AMD GPUs scores their speech at the sound level, and an adaptive "brain" personalises the next exercises and stories for each player.
 
 ## 2. Hard requirements (do not break these)
@@ -175,3 +175,37 @@ Each game is grounded in established dyslexia research. Do not drift into generi
 4. Implement `scoring.py` as pure functions (target phonemes vs heard phonemes → accuracy + error_type), with unit tests. No GPU needed.
 5. Write `docker-compose.yml` running backend (mock mode) + frontend locally.
 6. Then continue with whichever role's tasks the current user is working on (ask them).
+
+## 12. Event rules & judging (checked 12 Oct 2026, re-check at kickoff)
+
+Sources: [event page](https://lablab.ai/ai-hackathons/amd-developer-hackathon-act-iii), [rule book](https://lablab.ai/hackathon-rules), [submission guidelines](https://lablab.ai/ai-articles/hackathon-guidelines). Breaking the submission guidelines can mean lower scores or disqualification.
+
+**Eligibility**
+- Teams of 1–6. **Every member** must be in the AMD AI Developer Program and sign up with AMD (new members get $100 of AMD credit).
+- The AMD component must be part of the **working product judges see**, not only a slide.
+- Must be original work and MIT-compliant. Plagiarism means immediate disqualification.
+- Submission deadline: **not published yet** ("to be announced"). Get it from the kickoff or Discord. Manual submission is possible for 6 hours afterwards, but only with organiser approval.
+
+**Judged on:** Presentation · Business value · Application of technology · Originality (no weights published).
+
+**Track 4 asks every team to explain the following (put each one in the deck, the video and the long description):**
+1. What we created.
+2. What the models generated or decided: phoneme scoring, story generation, and the choice of next exercise.
+3. How we control quality and consistency, e.g. phoneme scoring checked on recorded clips, stories limited to word lists and reading level.
+4. **Cost per generated experience** (GPU-seconds per session × droplet $/hour).
+5. **Who would pay, and why** (schools, tutors, parents).
+6. How the experience **changes for at least two audiences or inputs**: our demo with two different players.
+7. Why this wasn't practical before generative AI.
+
+**Submission checklist**
+- [ ] Title ≤ 50 characters. Short description ≤ 255 characters. Long description ≥ 100 words.
+- [ ] Track, technology tags (AMD Developer Cloud, ROCm, vLLM, …), and the "Additional information" field: how it scales beyond the hackathon.
+- [ ] Cover image: PNG or JPG, 16:9.
+- [ ] Video: **MP4, ≤ 5 minutes, < 300 MB**.
+- [ ] Slides: **PDF**.
+- [ ] Public GitHub repo, a README that runs, a containerised app (Docker), no secrets committed.
+- [ ] **Live application URL** for judges to try. The rule book names Streamlit, Replit or Vercel as demo platforms.
+
+**Consequences for our architecture**
+- A live URL means the frontend goes on Vercel (HTTPS). Browsers block calls from an https page to plain-http APIs, and the mic only works on https, so **the droplet API needs HTTPS** too (a Caddy reverse proxy with a domain, or a Cloudflare tunnel).
+- Judging happens **after** the deadline. Either the droplet stays up (budget credits for it), or the demo URL must fail gracefully. Decide this by Thursday.

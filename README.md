@@ -1,6 +1,6 @@
-# Voice reading games for dyslexia
+# Phonics Arcade
 
-Voice-controlled reading practice games. The player reads aloud, and AI models running on an AMD MI300X GPU (ROCm) score the speech one sound at a time. An adaptive layer then picks the next exercises and stories for that player.
+Voice-controlled reading practice games for people with dyslexia. The player reads aloud, and AI models running on an AMD MI300X GPU (ROCm) score the speech one sound at a time. An adaptive layer then picks the next exercises and stories for that player.
 
 > This is a practice and support tool. It is not a medical or clinical product.
 
