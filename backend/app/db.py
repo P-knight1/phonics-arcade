@@ -1,7 +1,8 @@
-"""SQLite storage: every scored attempt (for /progress and weak sounds) and each player's level per game."""
+"""SQLite storage: player profiles, every scored attempt (for /progress and weak sounds), each player's level per game."""
 import json
 import os
 import sqlite3
+import uuid
 from contextlib import contextmanager
 from datetime import date
 from pathlib import Path
@@ -30,7 +31,16 @@ CREATE TABLE IF NOT EXISTS levels (
     level INTEGER NOT NULL,
     PRIMARY KEY (player_id, game)
 );
+CREATE TABLE IF NOT EXISTS players (
+    player_id TEXT PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    interests TEXT NOT NULL
+);
 """
+
+
+class NameTaken(Exception):
+    pass
 
 
 @contextmanager
@@ -76,20 +86,46 @@ def set_level(player_id: str, game: str, level: int) -> None:
         con.execute("INSERT OR REPLACE INTO levels (player_id, game, level) VALUES (?, ?, ?)", (player_id, game, level))
 
 
-def sessions(player_id: str) -> list[dict]:
-    """One session per day: word accuracy, mean response time, error counts (mistakes only)."""
+def sessions(player_id: str, game: str | None = None) -> list[dict]:
+    """One session per day: word accuracy, phoneme accuracy, mean response time, error counts (mistakes only)."""
+    where, args = ("player_id = ? AND game = ?", (player_id, game)) if game else ("player_id = ?", (player_id,))
     with connect() as con:
         days = con.execute(
-            "SELECT day, AVG(correct), AVG(response_ms) FROM attempts WHERE player_id = ? GROUP BY day ORDER BY day",
-            (player_id,),
+            f"SELECT day, AVG(correct), AVG(phoneme_accuracy), AVG(response_ms) FROM attempts WHERE {where}"
+            " GROUP BY day ORDER BY day",
+            args,
         ).fetchall()
         errors = con.execute(
-            "SELECT day, error_type, COUNT(*) FROM attempts WHERE player_id = ? AND error_type != 'none'"
+            f"SELECT day, error_type, COUNT(*) FROM attempts WHERE {where} AND error_type != 'none'"
             " GROUP BY day, error_type",
-            (player_id,),
+            args,
         ).fetchall()
-    out = {day: {"date": day, "accuracy": round(acc, 2), "avg_response_ms": None if ms is None else round(ms), "errors": {}}
-           for day, acc, ms in days}
+    out = {day: {"date": day, "accuracy": round(acc, 2), "phoneme_accuracy": round(ph, 2),
+                 "avg_response_ms": None if ms is None else round(ms), "errors": {}}
+           for day, acc, ph, ms in days}
     for day, err, n in errors:
         out[day]["errors"][err] = n
     return list(out.values())
+
+
+def create_player(name: str, interests: list[str]) -> dict:
+    player = {"player_id": uuid.uuid4().hex, "name": name, "interests": interests}
+    try:
+        with connect() as con:
+            con.execute("INSERT INTO players (player_id, name, interests) VALUES (?, ?, ?)",
+                        (player["player_id"], name, json.dumps(interests)))
+    except sqlite3.IntegrityError as e:  # names are unique, ignoring case
+        raise NameTaken(name) from e
+    return player
+
+
+def list_players() -> list[dict]:
+    with connect() as con:
+        rows = con.execute("SELECT player_id, name, interests FROM players ORDER BY name COLLATE NOCASE").fetchall()
+    return [{"player_id": p, "name": n, "interests": json.loads(i)} for p, n, i in rows]
+
+
+def get_player(player_id: str) -> dict | None:
+    with connect() as con:
+        row = con.execute("SELECT name, interests FROM players WHERE player_id = ?", (player_id,)).fetchone()
+    return {"player_id": player_id, "name": row[0], "interests": json.loads(row[1])} if row else None

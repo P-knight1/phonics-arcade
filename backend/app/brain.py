@@ -115,6 +115,8 @@ def _complete(prompt: str) -> str:
 def story(player_id: str, weak: list[str], interests: list[str]) -> dict:
     if not weak:  # frontend doesn't know the weak sounds; the recorded attempts do
         weak = weak_sounds(db.recent_attempts(player_id))
+    if not interests and (player := db.get_player(player_id)):
+        interests = player["interests"]
     template = Template((CONTENT_DIR / "prompts" / "story.txt").read_text(encoding="utf-8"))
     prompt = template.safe_substitute(weak_sounds=", ".join(weak) or "any", interests=", ".join(interests) or "animals")
     try:

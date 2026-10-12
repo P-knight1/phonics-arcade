@@ -13,7 +13,8 @@ The API contract is section 4 of [HANDOFF.md](../HANDOFF.md). Read the **"Propos
 | Scoring: sounds compared, accuracy, error type | ✅ Done | Pure functions, tested. |
 | Text → sounds (espeak-ng) | ✅ Done | Bundled, so nothing to install. British English. |
 | Debug mode through the real pipeline (`heard_text`) | ✅ Done | Typed answers are scored, saved and adapt the level. |
-| Progress saved per player (SQLite) + `/progress` | ✅ Done | One session per day. |
+| Player profiles (`/players`): nickname + interests, no password | ✅ Done | Real in both modes. |
+| Progress saved per player (SQLite) + `/progress` | ✅ Done | Per day: word accuracy, phoneme accuracy, speed, errors. Filter by game. |
 | Adaptive `/next-exercise` | ✅ Done for Word Flash | Needs a content file per game (see Content). |
 | `/story` via vLLM | 🟡 Built, not tried on a real model | Needs the droplet. Returns `503` until then. |
 | **Audio → sounds (`speech.py`)** | ❌ **Missing** | AI & Infrastructure. Audio scoring returns `503` until then. |
@@ -43,7 +44,26 @@ Then open **http://localhost:8000/docs** to try every endpoint in the browser. `
 ## 3. Frontend A: shell, Word Flash, Sound Surgery
 
 ### Player select
-The backend has no "players" endpoint. Keep players (name, interests) in the browser (localStorage). Generate a `player_id` once per player (e.g. `crypto.randomUUID()`, at most 64 characters) and send it on every call.
+Players are **profiles without passwords**, saved on the server, so they work on any device:
+
+```js
+// List for the player-select screen
+const { players } = await (await fetch(`${API_BASE_URL}/players`)).json();
+// → [{ player_id: "3f2a…", name: "Sam", interests: ["football"] }, …]
+
+// "New player" form
+const r = await fetch(`${API_BASE_URL}/players`, {
+  method: "POST", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ name: "Sam", interests: ["football", "space"] }),
+});
+// 201 → the new player · 409 → name taken (names are unique, ignoring case) · 422 → empty or too long
+```
+
+- `name`: 1–30 characters. `interests`: up to 5, each up to 40 characters.
+- Ask for a **nickname**, not a real name: the player list is visible to anyone using the app.
+- Remember the chosen `player_id` in the browser (localStorage), so the player doesn't pick again on every visit. Send it on every call.
+- `/players` stores data for real in mock mode too: there's no AI involved, so nothing to fake.
+- No editing or deleting yet. Ask Backend if you need it.
 
 ### Sending an answer
 Every answer goes to `POST /score` as `multipart/form-data`:
@@ -106,14 +126,20 @@ Items come from `/next-exercise` with `game: "echo_chain"` once Content adds `co
 ### Progress Dashboard
 `GET /progress/{player_id}` → one entry per day:
 ```json
-{ "date": "2026-10-14", "accuracy": 0.72, "avg_response_ms": 1650, "errors": { "letter_reversal": 4, "missing_sound": 2 } }
+{ "date": "2026-10-14", "accuracy": 0.72, "phoneme_accuracy": 0.86, "avg_response_ms": 1650, "errors": { "letter_reversal": 4, "missing_sound": 2 } }
 ```
-- `accuracy` = share of words fully correct that day (0–1).
+- `accuracy` = share of words fully correct that day (0–1): **word accuracy**.
+- `phoneme_accuracy` = average share of sounds said right (0–1): **how precisely** they read. It rises before `accuracy` does, so it shows progress early.
+- `avg_response_ms` = average time from the word appearing to the answer arriving: **speed**. Lower is better.
 - `avg_response_ms` can be **`null`** (no timed answers that day): draw a gap, not 0.
 - `errors` lists only error types that happened. Treat a missing key as 0.
 - An unknown player returns `{"sessions": []}`, so show an empty state.
+- **One game only:** `GET /progress/{player_id}?game=word_flash`. Leave `game` out for all games together.
 
 Mock mode returns 5 improving days, so you can build the charts now.
+
+### Story Recall
+`POST /story` with `{ "player_id": "…" }` is enough: empty `weak_sounds` and `interests` are filled from the player's recorded attempts and profile. The reply is `{ story, questions: [{ q, answer }] }`. To read the story aloud, send it through `/score` one sentence at a time (`target` = the sentence). Checking spoken answers to the questions is still open (section 7). It returns `503` until the droplet's language model is connected: use mock mode until then.
 
 ---
 

@@ -94,7 +94,9 @@ Nothing above changes. Clients that ignore these keep working.
 - `/score` with **no `audio` and no `heard_text`** means the player didn't answer (e.g. the word disappeared): `error_type: "no_response"`.
 - `response_ms` is `null` when `shown_at_ms` isn't sent. `shown_at_ms` is the browser's `Date.now()` when the prompt appeared. `avg_response_ms` in `/progress` is `null` on a day with no response times.
 - `/next-exercise` `history` = the `/score` results of **the round just played** (empty on the first call). The server remembers each player's level per game.
-- `/story` with an empty `weak_sounds` uses the player's weak sounds from their recorded attempts.
+- `/story` with an empty `weak_sounds` uses the player's weak sounds from their recorded attempts. An empty `interests` uses the player's profile.
+- **Player profiles (no password):** `POST /players` `{ "name": "Sam", "interests": ["football"] }` → `201 { "player_id": "…", "name": "Sam", "interests": ["football"] }` (`409` if the name is taken, ignoring case). `GET /players` → `{ "players": [ … ] }`. Real in mock mode too.
+- `/progress` sessions also include `phoneme_accuracy` (average share of sounds said right that day). `GET /progress/{player_id}?game=word_flash` limits it to one game.
 - `accuracy` in `/progress` = word accuracy (share of attempts fully correct) per day. `errors` counts only mistakes.
 
 ## 5. Mock-first rule
@@ -164,7 +166,7 @@ R1 = AI & Infrastructure · R2 = Backend & Scoring · R3 = Frontend A · R4 = Fr
 | All | Decisions meeting: the questions in `docs/backend-guide.md` section 7, plus the frontend framework | — |
 | R1 | Droplet up. vLLM answering on localhost with an API key. Backend running on the droplet in Docker. SSH access for the team | Backend image (D0) |
 | R2 | Write the decisions into this file (contract additions, item formats). Help everyone run the backend | Meeting (D1) |
-| R3 | Frontend scaffold + `api.ts`. Shell (player select in localStorage, menu, mic recorder). **Word Flash playable with debug buttons** against mock mode | Mock API (D0), framework (D1 meeting) |
+| R3 | Frontend scaffold + `api.ts`. Shell (player select using `/players`, menu, mic recorder). **Word Flash playable with debug buttons** against mock mode | Mock API (D0), framework (D1 meeting) |
 | R4 | **Echo Chain playable with debug buttons**, built as its own page in the agreed framework, against mock mode, with sample syllables | Mock API (D0), framework (D1 meeting) |
 | R5 | `word_flash.json` v1 (real phonics progression, replaces the starter list). **Evaluation set:** 2+ adult team members record about 30 starter words, read correctly and with deliberate mistakes (bog/dog, dropped sounds), plus `labels.csv` (file, target, what was said, expected `error_type`). Audio stays outside git | Starter list + format (D0) |
 | R5 | **Feedback wording** (`content/feedback.json`: a kind, encouraging message per `error_type`, plus menu and game text, with no medical claims). **Dyslexia-friendly UI guide** (1 page: font, size, spacing, colours, no italics, short instructions). **Two demo personas** (name, weak sounds, interests). **Team admin:** team registered on lablab.ai, everyone in the AMD program, the deadline from the kickoff written into section 12 | Error types (D0), rules (D0) |

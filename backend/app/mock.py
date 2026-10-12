@@ -56,6 +56,7 @@ def progress(player_id: str) -> dict:
         {
             "date": (today - timedelta(days=4 - i)).isoformat(),
             "accuracy": round(0.55 + 0.06 * i, 2),
+            "phoneme_accuracy": round(0.7 + 0.05 * i, 2),
             "avg_response_ms": 2200 - 150 * i,
             "errors": {"letter_reversal": 5 - i, "missing_sound": 3 - i // 2},
         }

@@ -1,11 +1,14 @@
 import os
 import time
 
-from fastapi import FastAPI, File, Form, HTTPException, Path, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Path, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import brain, db, g2p, mock, scoring, speech
-from .schemas import NextExerciseRequest, NextExerciseResponse, ProgressResponse, ScoreResponse, StoryRequest, StoryResponse
+from .schemas import (
+    NextExerciseRequest, NextExerciseResponse, Player, PlayerCreate, PlayersResponse, ProgressResponse, ScoreResponse,
+    StoryRequest, StoryResponse,
+)
 
 MOCK = os.getenv("MOCK_MODE") == "1"
 MAX_AUDIO_BYTES = 5_000_000  # ~5 min of webm/opus; a word is a few KB
@@ -22,13 +25,13 @@ def health():
 
 @app.post("/score", response_model=ScoreResponse)
 def score(
-    target: str = Form(..., min_length=1, max_length=100),
+    target: str = Form(..., min_length=1, max_length=300),  # up to one story sentence
     audio: UploadFile | None = File(None),
     shown_at_ms: int | None = Form(None),
     # Optional additions, proposed in HANDOFF.md section 4: record progress / score typed text in debug mode.
     player_id: str | None = Form(None, min_length=1, max_length=64),
     game: str = Form("", pattern=r"^[a-z_]{0,32}$"),
-    heard_text: str | None = Form(None, max_length=100),
+    heard_text: str | None = Form(None, max_length=300),
 ):
     received_ms = time.time() * 1000
     if audio is None:  # no recording and nothing typed (forms send "" as missing): the player didn't answer
@@ -85,7 +88,24 @@ def story(req: StoryRequest):
 
 
 @app.get("/progress/{player_id}", response_model=ProgressResponse)
-def progress(player_id: str = Path(..., min_length=1, max_length=64)):
+def progress(
+    player_id: str = Path(..., min_length=1, max_length=64),
+    game: str | None = Query(None, pattern=r"^[a-z_]{1,32}$"),  # one game only; omit for all games
+):
     if MOCK:
         return mock.progress(player_id)
-    return {"sessions": db.sessions(player_id)}
+    return {"sessions": db.sessions(player_id, game)}
+
+
+# Players are plain storage (no AI to wait for), so they are real in mock mode too.
+@app.post("/players", response_model=Player, status_code=201)
+def create_player(req: PlayerCreate):
+    try:
+        return db.create_player(req.name, req.interests)
+    except db.NameTaken:
+        raise HTTPException(409, "That name is already taken")
+
+
+@app.get("/players", response_model=PlayersResponse)
+def list_players():
+    return {"players": db.list_players()}
