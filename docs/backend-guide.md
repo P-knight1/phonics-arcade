@@ -14,6 +14,7 @@ The API contract is section 4 of [HANDOFF.md](../HANDOFF.md). Read the **"Propos
 | Text → sounds (espeak-ng) | ✅ Done | Bundled, so nothing to install. British English. |
 | Debug mode through the real pipeline (`heard_text`) | ✅ Done | Typed answers are scored, saved and adapt the level. |
 | Accounts: register / login / logout with a password, login tokens | ✅ Done | Each player sees only their own data. Real in both modes. |
+| Guest play (no account) | ✅ Done | Fully personalised during the visit; deleted on logout or after 24 hours. |
 | Progress saved per player (SQLite) + `/progress` | ✅ Done | Per day: word accuracy, phoneme accuracy, speed, errors. Filter by game. |
 | Adaptive `/next-exercise` | ✅ Done for Word Flash | Needs a content file per game (see Content). |
 | `/story` via vLLM | 🟡 Built, not tried on a real model | Needs the droplet. Returns `503` until then. |
@@ -78,6 +79,23 @@ await fetch(`${API_BASE_URL}/logout`, { method: "POST", headers: auth });  // 20
 - Accounts are real in mock mode too, so the login flow works from Day 1. In mock mode, game data is still fake.
 - Until the droplet API has HTTPS (Day 3), passwords travel unencrypted over the internet, so only use **throwaway test passwords**. On localhost this doesn't matter.
 - There's no password reset or account deletion yet. Ask Backend if you need it.
+
+### Play as a guest
+A **"Play as guest"** button, for players who don't want an account and for judges who want to try the app fast:
+
+```js
+const r = await fetch(`${API_BASE_URL}/guest`, {
+  method: "POST", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ interests: ["football"] }),   // optional, used for stories
+});
+const { player_id, token } = await r.json();          // 201, name is always "Guest"
+```
+
+- **Use it exactly like a login token.** Scoring, levels, practice on weak sounds, stories and progress all work during the visit.
+- **Keep a guest's `token` in a JavaScript variable only**, never in `localStorage` or `sessionStorage`. Leaving or reloading the page then ends the guest visit, so the progress is gone, as intended.
+- **The server deletes the guest's data** as soon as you call `POST /logout` with their token, and otherwise after 24 hours. Call `/logout` when the guest presses "Leave".
+- Tell the player before they start: *"Guest progress isn't saved. Create an account to keep it."*
+- A guest can't turn into an account later (their progress isn't carried over). Ask Backend if you need it.
 
 ### Sending an answer
 Every answer goes to `POST /score` as `multipart/form-data`:

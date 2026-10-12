@@ -88,6 +88,7 @@ Response:
 Nothing above changes. Clients that ignore these keep working.
 
 - **Accounts:** `POST /players` `{ "name": "Sam", "password": "…", "interests": ["football"] }` registers (`201`; `409` if the name is taken, ignoring case). `POST /login` `{ "name", "password" }` logs in (`401` if wrong). Both return `{ "player_id", "name", "interests", "token" }`. `GET /me` returns the profile. `POST /logout` ends the login. Logins expire after 30 days.
+- **Guest play:** `POST /guest` (optional body `{ "interests": [...] }`) → `201 { "player_id", "name": "Guest", "interests", "token" }`. It works exactly like a login during the visit. The frontend keeps the token in memory only, so leaving the page ends it. The server deletes all guest data on `/logout`, or 24 hours after the guest started.
 - **Every request sends `Authorization: Bearer <token>`.** `/next-exercise`, `/story` and `/progress` require it (`401` without it), and their `player_id` must be the logged-in player's own (`403` otherwise). `/score` saves the attempt to the logged-in player, and without a token it scores but doesn't save.
 - `/score` takes 2 **optional** form fields:
   - `game`: e.g. `word_flash`, stored with the attempt.

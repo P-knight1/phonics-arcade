@@ -65,6 +65,10 @@ Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max
 Password = Annotated[str, Field(min_length=8, max_length=128)]
 
 
+class GuestStart(BaseModel):
+    interests: list[Interest] = Field(default=[], max_length=5)
+
+
 class Login(BaseModel):
     name: Name
     password: Password

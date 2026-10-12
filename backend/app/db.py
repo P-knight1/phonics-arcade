@@ -1,4 +1,4 @@
-"""SQLite storage: accounts and logins, every scored attempt (for /progress and weak sounds), each player's level per game."""
+"""SQLite storage: accounts, guests and logins, every scored attempt (for /progress and weak sounds), each player's level per game."""
 import hashlib
 import hmac
 import json
@@ -41,6 +41,11 @@ CREATE TABLE IF NOT EXISTS accounts (
     password_hash TEXT NOT NULL,
     interests TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS guests (
+    player_id TEXT PRIMARY KEY,
+    interests TEXT NOT NULL,
+    created_at REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS logins (
     token_hash TEXT PRIMARY KEY,
     player_id TEXT NOT NULL,
@@ -50,6 +55,7 @@ CREATE TABLE IF NOT EXISTS logins (
 
 
 LOGIN_DAYS = 30
+GUEST_HOURS = 24  # guest data is deleted after this, or when the guest logs out
 
 
 class NameTaken(Exception):
@@ -163,18 +169,43 @@ def start_login(player_id: str) -> str:
 
 
 def player_for_token(token: str) -> str | None:
+    now = time.time()
     with connect() as con:
-        row = con.execute("SELECT player_id FROM logins WHERE token_hash = ? AND created_at > ?",
-                          (_hash_token(token), time.time() - LOGIN_DAYS * 86400)).fetchone()
+        row = con.execute(
+            "SELECT l.player_id FROM logins l LEFT JOIN guests g ON g.player_id = l.player_id"
+            " WHERE l.token_hash = ? AND l.created_at > ? AND (g.player_id IS NULL OR g.created_at > ?)",
+            (_hash_token(token), now - LOGIN_DAYS * 86400, now - GUEST_HOURS * 3600),
+        ).fetchone()
     return row[0] if row else None
 
 
 def end_login(token: str) -> None:
     with connect() as con:
+        row = con.execute("SELECT player_id FROM logins WHERE token_hash = ?", (_hash_token(token),)).fetchone()
         con.execute("DELETE FROM logins WHERE token_hash = ?", (_hash_token(token),))
+        if row:
+            _forget_guests(con, "player_id = ?", (row[0],))  # a guest who leaves takes their data with them
+
+
+def _forget_guests(con, condition: str, args: tuple) -> None:
+    """Delete the guests matching condition and everything saved for them."""
+    ids = f"SELECT player_id FROM guests WHERE {condition}"
+    for table in ("attempts", "levels", "logins"):
+        con.execute(f"DELETE FROM {table} WHERE player_id IN ({ids})", args)
+    con.execute(f"DELETE FROM guests WHERE {condition}", args)
+
+
+def create_guest(interests: list[str]) -> dict:
+    player = {"player_id": uuid.uuid4().hex, "name": "Guest", "interests": interests}
+    with connect() as con:
+        _forget_guests(con, "created_at <= ?", (time.time() - GUEST_HOURS * 3600,))  # clear out expired guests
+        con.execute("INSERT INTO guests (player_id, interests, created_at) VALUES (?, ?, ?)",
+                    (player["player_id"], json.dumps(interests), time.time()))
+    return player
 
 
 def get_player(player_id: str) -> dict | None:
     with connect() as con:
-        row = con.execute("SELECT name, interests FROM accounts WHERE player_id = ?", (player_id,)).fetchone()
+        row = con.execute("SELECT name, interests FROM accounts WHERE player_id = ? UNION ALL"
+                          " SELECT 'Guest', interests FROM guests WHERE player_id = ?", (player_id, player_id)).fetchone()
     return {"player_id": player_id, "name": row[0], "interests": json.loads(row[1])} if row else None

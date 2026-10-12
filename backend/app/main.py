@@ -7,7 +7,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from . import brain, db, g2p, mock, scoring, speech
 from .schemas import (
-    Login, LoginResponse, NextExerciseRequest, NextExerciseResponse, Player, ProgressResponse, Register, ScoreResponse,
+    GuestStart, Login, LoginResponse, NextExerciseRequest, NextExerciseResponse, Player, ProgressResponse, Register, ScoreResponse,
     StoryRequest, StoryResponse,
 )
 
@@ -139,6 +139,13 @@ def login(req: Login):
     player = db.check_password(req.name, req.password)
     if player is None:
         raise HTTPException(401, "Wrong name or password")
+    return {**player, "token": db.start_login(player["player_id"])}
+
+
+@app.post("/guest", response_model=LoginResponse, status_code=201)
+def guest(req: GuestStart | None = None):
+    """Play without an account. Everything is deleted on logout, or GUEST_HOURS after starting."""
+    player = db.create_guest(req.interests if req else [])
     return {**player, "token": db.start_login(player["player_id"])}
 
 
