@@ -5,6 +5,50 @@
 
 Voice-controlled reading practice games for people with dyslexia. AI models running on an AMD MI300X GPU score each spoken word one sound at a time. This is a practice tool, not a medical one: never write "diagnose" or "diagnosis" anywhere.
 
+## 0. The project at a glance
+
+### What it is
+A web app of short reading games that you play **with your voice**. The player reads a word or sound aloud. The backend on the AMD GPU works out which **sounds** they actually said, compares them with the target, and names the mistake (e.g. "b/d swap", "missed a sound"). An adaptive "brain" then picks the next words and writes short personalised stories, so two players get two different experiences.
+
+**Who it's for:** children and adults with dyslexia who want to practise reading, plus the parents, tutors and schools who support them (and would pay for it).
+
+**Why it's new:** ordinary speech-to-text "corrects" what you say (you read *bog*, it writes *dog*). Scoring sound by sound with a phoneme model, plus stories generated for each player, wasn't practical before modern AI on large GPUs.
+
+### What the player sees
+1. **Player select:** pick or create a player (name and interests, e.g. football).
+2. **Game menu:** Word Flash · Sound Surgery · Echo Chain · Story Recall · Progress.
+3. **In a game:** a big word or prompt, a mic button, and instant feedback (✓, or "you said *bog*, try *d*"). It gets faster when you succeed and slower, repeating patterns, when you struggle.
+4. **Progress dashboard:** charts of accuracy, response time and error types across sessions.
+
+| Game | Player does | Priority |
+|---|---|---|
+| Word Flash | Reads a word that disappears quickly; speed adapts | Must |
+| Sound Surgery | "Say *cat* without the *c*", "swap the *m* in *map* for *s*" | Must |
+| Echo Chain | Repeats a growing chain of sounds or syllables | Must |
+| Story Recall | Reads an AI story built from their weak sounds and interests, then answers questions by voice | Should |
+| Progress Dashboard | Sees improvement over sessions | Must |
+| Beat Reader | Syllables on a beat | Cut unless there is spare time |
+
+### How it fits together
+```
+Browser (Vercel, HTTPS)  ──HTTPS──▶  FastAPI on AMD droplet (MI300X, ROCm)
+ game UI + microphone                  ├─ phoneme model  → scoring (what sounds were said)
+                                       ├─ Whisper        → free speech (Story Recall answers)
+                                       └─ LLM via vLLM   → stories (localhost only, never public)
+```
+
+### Requirements
+- **Must:** all AI runs on the AMD droplet, and the demo visibly uses it · Docker · public MIT repo · README that runs · no secrets in git · no medical claims · a live URL for judges.
+- **Must:** every game is playable with debug buttons even when the AI is down (mock mode).
+- **Should:** the mic is the main input; feedback appears in about 2 s or less after the player stops speaking.
+- **Submission:** MP4 video (≤ 5 min), PDF slides, 16:9 cover image (see HANDOFF.md section 12).
+
+### Expected results (what "done" looks like on Saturday)
+- A judge opens the live URL, picks a player, reads words into the mic, and sees sound-level feedback scored on AMD hardware.
+- The demo video shows **two players** getting **different** exercises and stories from the same app (a Track 4 requirement).
+- The dashboard shows each player's accuracy, response time and error types over sessions.
+- The deck answers what we built, what the AI decides, how we control quality, **cost per session**, and who pays.
+
 ## 1. Get the code
 
 ```bash
