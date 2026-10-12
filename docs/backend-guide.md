@@ -18,7 +18,7 @@ The API contract is section 4 of [HANDOFF.md](../HANDOFF.md). Read the **"Propos
 | `/story` via vLLM | 🟡 Built, not tried on a real model | Needs the droplet. Returns `503` until then. |
 | **Audio → sounds (`speech.py`)** | ❌ **Missing** | AI & Infrastructure. Audio scoring returns `503` until then. |
 | Content for Sound Surgery and Echo Chain | ❌ Missing | Content. |
-| Docker image | 🟡 Written, not built yet | First local build pending. GPU support comes with `speech.py` (section 5). |
+| Docker image | ✅ Builds and runs | Tested on Linux x86-64 (WSL): all 34 tests pass in the container. GPU support comes with `speech.py` (section 5). |
 | HTTPS for the API, live URL for judges | ❌ Missing, no owner yet | Required by the rules (HANDOFF.md section 12). |
 | Checking spoken Story Recall answers | ❌ Not designed | Needs a team decision (section 7). |
 
