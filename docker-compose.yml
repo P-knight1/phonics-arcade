@@ -1,6 +1,7 @@
 services:
   backend:
     build: ./backend
+    platform: linux/amd64       # the espeak package has no ARM Linux build; Apple Silicon runs this emulated
     ports: ["8000:8000"]
     env_file: .env
     volumes:

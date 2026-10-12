@@ -18,7 +18,7 @@ The API contract is section 4 of [HANDOFF.md](../HANDOFF.md). Read the **"Propos
 | `/story` via vLLM | 🟡 Built, not tried on a real model | Needs the droplet. Returns `503` until then. |
 | **Audio → sounds (`speech.py`)** | ❌ **Missing** | AI & Infrastructure. Audio scoring returns `503` until then. |
 | Content for Sound Surgery and Echo Chain | ❌ Missing | Content. |
-| Docker image | 🟡 Written, never built | Docker isn't installed on the machine it was written on. Build it on Day 1. |
+| Docker image | 🟡 Written, not built yet | First local build pending. GPU support comes with `speech.py` (section 5). |
 | HTTPS for the API, live URL for judges | ❌ Missing, no owner yet | Required by the rules (HANDOFF.md section 12). |
 | Checking spoken Story Recall answers | ❌ Not designed | Needs a team decision (section 7). |
 
@@ -145,8 +145,10 @@ Run your model on recorded clips of the starter words in `content/word_flash.jso
 - Keep vLLM on `localhost` on the droplet (the backend calls it locally) and keep the API key on.
 
 ### Droplet, Docker, HTTPS
-- Build the image on the droplet: `docker compose up --build`. The espeak library inside the Linux image is still untested.
+- On the droplet: `docker compose up -d --build`.
 - The repo's `content/` folder is mounted into the container, and the SQLite file lives in `data/` (kept on the host).
+- **Inside the container, `localhost` is the container itself, not the droplet.** `VLLM_BASE_URL=http://localhost:…` won't reach vLLM. On the droplet, either add `network_mode: host` to the backend service (vLLM can then stay bound to 127.0.0.1, which is the safest option), or put the backend and vLLM on one Docker network and use the vLLM container's name.
+- **When `speech.py` loads models, the backend container needs the GPU:** a ROCm PyTorch base image instead of `python:3.12-slim`, plus `devices: [/dev/kfd, /dev/dri]` and `group_add: [video]` in compose. Keep `ffmpeg` and `requirements.txt`.
 - Judges' browsers need **HTTPS** to the API (a Caddy reverse proxy or a Cloudflare tunnel). CORS is already open.
 - Measure the GPU time per `/score` and per `/story` call: Content needs it for "cost per session" in the pitch.
 
