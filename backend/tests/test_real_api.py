@@ -6,9 +6,10 @@ import pytest
 from app import brain, speech
 
 
-def say(client, target, heard, player="p1", game="word_flash", **extra):
-    data = {"target": target, "heard_text": heard, "player_id": player, "game": game, **extra}
-    return client.post("/score", data=data)
+def say(client, target, heard, auth=None, game="word_flash", **extra):
+    """auth = (player_id, headers) from the login fixture; None = anonymous (scored, not saved)."""
+    data = {"target": target, "heard_text": heard, "game": game, **extra}
+    return client.post("/score", data=data, headers=auth[1] if auth else None)
 
 
 def test_score_heard_text(client):
@@ -48,18 +49,20 @@ def test_score_rejects_bad_input(client):
     assert client.post("/score", data={"target": "dog"}, files=big).status_code == 413
 
 
-def test_progress_from_recorded_attempts(client):
-    say(client, "dog", "dog")
-    say(client, "dog", "bog")
-    say(client, "cat", "at")
-    say(client, "dog", "dog", player="someone_else")
-    say(client, "dog", "dog", player="")  # no player: scored, not recorded
-    sessions = client.get("/progress/p1").json()["sessions"]
+def test_progress_from_recorded_attempts(client, login):
+    p1 = login(client, "p1")
+    say(client, "dog", "dog", p1)
+    say(client, "dog", "bog", p1)
+    say(client, "cat", "at", p1)
+    say(client, "dog", "dog", login(client, "someone_else"))
+    say(client, "dog", "dog")  # not logged in: scored, not recorded
+    sessions = client.get(f"/progress/{p1[0]}", headers=p1[1]).json()["sessions"]
     assert len(sessions) == 1
     assert sessions[0]["accuracy"] == 0.33
     assert sessions[0]["avg_response_ms"] is None
     assert sessions[0]["errors"] == {"letter_reversal": 1, "missing_sound": 1}
-    assert client.get("/progress/nobody").json() == {"sessions": []}
+    fresh = login(client, "fresh")
+    assert client.get(f"/progress/{fresh[0]}", headers=fresh[1]).json() == {"sessions": []}
 
 
 @pytest.fixture
@@ -72,52 +75,58 @@ def levels(tmp_path, monkeypatch):
 
 
 def result(client, target, heard):
-    return say(client, target, heard, player="").json()
+    return say(client, target, heard).json()
 
 
-def ask(client, history, player="p1"):
-    return client.post("/next-exercise", json={"player_id": player, "game": "word_flash", "history": history})
+def ask(client, history, who):
+    pid, headers = who
+    return client.post("/next-exercise", json={"player_id": pid, "game": "word_flash", "history": history},
+                       headers=headers)
 
 
-def test_next_exercise_levels_up_down_and_remembers(client, levels):
-    first = ask(client, []).json()
+def test_next_exercise_levels_up_down_and_remembers(client, levels, login):
+    p1 = login(client, "p1")
+    first = ask(client, [], p1).json()
     assert (first["level"], first["display_ms"], first["reason"]) == (1, 2000, "one")
     assert len(first["items"]) == 5 and set(first["items"]) <= {"cat", "hat", "dad", "mat", "sat", "dig"}
 
     good = [result(client, w, w) for w in ("cat", "hat", "mat")]
-    up = ask(client, good).json()
+    up = ask(client, good, p1).json()
     assert (up["level"], up["display_ms"], up["reason"]) == (2, 1500, "level up: two")
-    assert ask(client, good).json()["level"] == 2  # top level: stays
-    assert ask(client, []).json()["level"] == 2    # remembered between calls
+    assert ask(client, good, p1).json()["level"] == 2  # top level: stays
+    assert ask(client, [], p1).json()["level"] == 2    # remembered between calls
 
     bad = [result(client, w, "") for w in ("bed", "red", "pen")]
-    assert ask(client, bad).json()["level"] == 1
-    assert ask(client, [], player="p2").json()["level"] == 1  # per player
+    assert ask(client, bad, p1).json()["level"] == 1
+    assert ask(client, [], login(client, "p2")).json()["level"] == 1  # per player
 
 
-def test_next_exercise_needs_three_results_to_move(client, levels):
-    assert ask(client, [result(client, "cat", "cat")] * 2).json()["level"] == 1
+def test_next_exercise_needs_three_results_to_move(client, levels, login):
+    assert ask(client, [result(client, "cat", "cat")] * 2, login(client)).json()["level"] == 1
 
 
-def test_next_exercise_targets_weak_sounds(client, levels):
+def test_next_exercise_targets_weak_sounds(client, levels, login):
     history = [result(client, "dad", "bab"), result(client, "dig", "big"), result(client, "cat", "cat")]
-    r = ask(client, history).json()
+    r = ask(client, history, login(client)).json()
     assert r["reason"] == "practising d"
     assert r["items"][:2] == ["dad", "dig"] or r["items"][:2] == ["dig", "dad"]  # only two level-1 words have /d/
 
 
-def test_first_round_uses_recorded_weak_sounds(client, levels):
-    say(client, "dad", "bab", player="p3")
-    assert ask(client, [], player="p3").json()["reason"] == "practising d"
-    assert ask(client, [], player="p4").json()["reason"] == "one"  # a different player gets a different round
+def test_first_round_uses_recorded_weak_sounds(client, levels, login):
+    p3 = login(client, "p3")
+    say(client, "dad", "bab", p3)
+    assert ask(client, [], p3).json()["reason"] == "practising d"
+    assert ask(client, [], login(client, "p4")).json()["reason"] == "one"  # a different player, a different round
 
 
-def test_next_exercise_unknown_game(client):
-    r = client.post("/next-exercise", json={"player_id": "p1", "game": "beat_reader", "history": []})
+def test_next_exercise_unknown_game(client, login):
+    pid, auth = login(client)
+    r = client.post("/next-exercise", json={"player_id": pid, "game": "beat_reader", "history": []}, headers=auth)
     assert r.status_code == 404
 
 
-def test_story_uses_llm_and_recorded_weak_sounds(client, monkeypatch):
+def test_story_uses_llm_and_recorded_weak_sounds(client, monkeypatch, login):
+    p1 = login(client)
     prompts = []
 
     def fake_llm(prompt):
@@ -125,18 +134,20 @@ def test_story_uses_llm_and_recorded_weak_sounds(client, monkeypatch):
         return json.dumps({"story": "Ben the dog.", "questions": [{"q": "Who?", "answer": "Ben"}]})
 
     monkeypatch.setattr(brain, "_complete", fake_llm)
-    say(client, "dog", "bog")
-    r = client.post("/story", json={"player_id": "p1", "weak_sounds": [], "interests": ["football"]})
+    say(client, "dog", "bog", p1)
+    r = client.post("/story", json={"player_id": p1[0], "weak_sounds": [], "interests": ["football"]}, headers=p1[1])
     assert r.status_code == 200 and r.json()["questions"][0]["answer"] == "Ben"
     assert "sounds (IPA symbols): d" in prompts[0] and "interests: football" in prompts[0]
 
 
-def test_story_bad_llm_output_is_503(client, monkeypatch):
+def test_story_bad_llm_output_is_503(client, monkeypatch, login):
+    pid, auth = login(client)
     monkeypatch.setattr(brain, "_complete", lambda prompt: "not json")
-    assert client.post("/story", json={"player_id": "p1"}).status_code == 503
+    assert client.post("/story", json={"player_id": pid}, headers=auth).status_code == 503
 
 
-def test_story_without_vllm_config_is_503(client, monkeypatch):
+def test_story_without_vllm_config_is_503(client, monkeypatch, login):
+    pid, auth = login(client)
     monkeypatch.delenv("VLLM_BASE_URL", raising=False)
-    r = client.post("/story", json={"player_id": "p1"})
+    r = client.post("/story", json={"player_id": pid}, headers=auth)
     assert r.status_code == 503 and "not set" in r.json()["detail"]

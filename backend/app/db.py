@@ -1,7 +1,11 @@
-"""SQLite storage: player profiles, every scored attempt (for /progress and weak sounds), each player's level per game."""
+"""SQLite storage: accounts and logins, every scored attempt (for /progress and weak sounds), each player's level per game."""
+import hashlib
+import hmac
 import json
 import os
 import sqlite3
+import secrets
+import time
 import uuid
 from contextlib import contextmanager
 from datetime import date
@@ -31,16 +35,33 @@ CREATE TABLE IF NOT EXISTS levels (
     level INTEGER NOT NULL,
     PRIMARY KEY (player_id, game)
 );
-CREATE TABLE IF NOT EXISTS players (
+CREATE TABLE IF NOT EXISTS accounts (
     player_id TEXT PRIMARY KEY,
     name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    password_hash TEXT NOT NULL,
     interests TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS logins (
+    token_hash TEXT PRIMARY KEY,
+    player_id TEXT NOT NULL,
+    created_at REAL NOT NULL
 );
 """
 
 
+LOGIN_DAYS = 30
+
+
 class NameTaken(Exception):
     pass
+
+
+def _hash_password(password: str, salt: bytes) -> bytes:
+    return hashlib.scrypt(password.encode(), salt=salt, n=2**14, r=8, p=1, dklen=32)
+
+
+def _hash_token(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()  # a leaked database can't be used to log in
 
 
 @contextmanager
@@ -108,24 +129,52 @@ def sessions(player_id: str, game: str | None = None) -> list[dict]:
     return list(out.values())
 
 
-def create_player(name: str, interests: list[str]) -> dict:
+def create_account(name: str, password: str, interests: list[str]) -> dict:
+    salt = secrets.token_bytes(16)
     player = {"player_id": uuid.uuid4().hex, "name": name, "interests": interests}
     try:
         with connect() as con:
-            con.execute("INSERT INTO players (player_id, name, interests) VALUES (?, ?, ?)",
-                        (player["player_id"], name, json.dumps(interests)))
+            con.execute("INSERT INTO accounts (player_id, name, password_hash, interests) VALUES (?, ?, ?, ?)",
+                        (player["player_id"], name, salt.hex() + "$" + _hash_password(password, salt).hex(),
+                         json.dumps(interests)))
     except sqlite3.IntegrityError as e:  # names are unique, ignoring case
         raise NameTaken(name) from e
     return player
 
 
-def list_players() -> list[dict]:
+def check_password(name: str, password: str) -> dict | None:
     with connect() as con:
-        rows = con.execute("SELECT player_id, name, interests FROM players ORDER BY name COLLATE NOCASE").fetchall()
-    return [{"player_id": p, "name": n, "interests": json.loads(i)} for p, n, i in rows]
+        row = con.execute("SELECT player_id, name, password_hash, interests FROM accounts WHERE name = ?",
+                          (name,)).fetchone()
+    if not row:
+        return None
+    salt, stored = row[2].split("$")
+    if not hmac.compare_digest(_hash_password(password, bytes.fromhex(salt)).hex(), stored):
+        return None
+    return {"player_id": row[0], "name": row[1], "interests": json.loads(row[3])}
+
+
+def start_login(player_id: str) -> str:
+    token = secrets.token_urlsafe(32)
+    with connect() as con:
+        con.execute("INSERT INTO logins (token_hash, player_id, created_at) VALUES (?, ?, ?)",
+                    (_hash_token(token), player_id, time.time()))
+    return token
+
+
+def player_for_token(token: str) -> str | None:
+    with connect() as con:
+        row = con.execute("SELECT player_id FROM logins WHERE token_hash = ? AND created_at > ?",
+                          (_hash_token(token), time.time() - LOGIN_DAYS * 86400)).fetchone()
+    return row[0] if row else None
+
+
+def end_login(token: str) -> None:
+    with connect() as con:
+        con.execute("DELETE FROM logins WHERE token_hash = ?", (_hash_token(token),))
 
 
 def get_player(player_id: str) -> dict | None:
     with connect() as con:
-        row = con.execute("SELECT name, interests FROM players WHERE player_id = ?", (player_id,)).fetchone()
+        row = con.execute("SELECT name, interests FROM accounts WHERE player_id = ?", (player_id,)).fetchone()
     return {"player_id": player_id, "name": row[0], "interests": json.loads(row[1])} if row else None

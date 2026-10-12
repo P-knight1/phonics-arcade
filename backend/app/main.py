@@ -1,12 +1,13 @@
 import os
 import time
 
-from fastapi import FastAPI, File, Form, HTTPException, Path, Query, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Path, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from . import brain, db, g2p, mock, scoring, speech
 from .schemas import (
-    NextExerciseRequest, NextExerciseResponse, Player, PlayerCreate, PlayersResponse, ProgressResponse, ScoreResponse,
+    Login, LoginResponse, NextExerciseRequest, NextExerciseResponse, Player, ProgressResponse, Register, ScoreResponse,
     StoryRequest, StoryResponse,
 )
 
@@ -16,6 +17,28 @@ MAX_AUDIO_BYTES = 5_000_000  # ~5 min of webm/opus; a word is a few KB
 app = FastAPI(title="Phonics Arcade API")
 # Browser game runs on another origin (localhost dev server, Vercel) than the API.
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+bearer = HTTPBearer(auto_error=False)  # "Authorization: Bearer <token>"; also adds the Authorize button to /docs
+
+
+def optional_player(creds: HTTPAuthorizationCredentials | None = Depends(bearer)) -> str | None:
+    """None when no token is sent; 401 when a token is sent but is wrong or expired."""
+    if creds is None:
+        return None
+    player = db.player_for_token(creds.credentials)
+    if player is None:
+        raise HTTPException(401, "Login expired, please log in again")
+    return player
+
+
+def logged_in(player: str | None = Depends(optional_player)) -> str:
+    if player is None:
+        raise HTTPException(401, "Log in first")
+    return player
+
+
+def own_data(player: str, player_id: str) -> None:
+    if player_id != player:
+        raise HTTPException(403, "That is another player's data")
 
 
 @app.get("/health")
@@ -28,10 +51,10 @@ def score(
     target: str = Form(..., min_length=1, max_length=300),  # up to one story sentence
     audio: UploadFile | None = File(None),
     shown_at_ms: int | None = Form(None),
-    # Optional additions, proposed in HANDOFF.md section 4: record progress / score typed text in debug mode.
-    player_id: str | None = Form(None, min_length=1, max_length=64),
+    # Optional additions, proposed in HANDOFF.md section 4: tag the game / score typed text in debug mode.
     game: str = Form("", pattern=r"^[a-z_]{0,32}$"),
     heard_text: str | None = Form(None, max_length=300),
+    player: str | None = Depends(optional_player),  # logged in: the attempt is saved to this player
 ):
     received_ms = time.time() * 1000
     if audio is None:  # no recording and nothing typed (forms send "" as missing): the player didn't answer
@@ -62,13 +85,14 @@ def score(
         "response_ms": None if shown_at_ms is None else max(0, round(received_ms - shown_at_ms)),
         **scoring.score(target_ph, heard_ph, target, heard),
     }
-    if player_id:
-        db.save_attempt(player_id, game, target, result)
+    if player:
+        db.save_attempt(player, game, target, result)
     return result
 
 
 @app.post("/next-exercise", response_model=NextExerciseResponse)
-def next_exercise(req: NextExerciseRequest):
+def next_exercise(req: NextExerciseRequest, player: str = Depends(logged_in)):
+    own_data(player, req.player_id)
     if MOCK:
         return mock.next_exercise(req.game, req.history)
     try:
@@ -78,7 +102,8 @@ def next_exercise(req: NextExerciseRequest):
 
 
 @app.post("/story", response_model=StoryResponse)
-def story(req: StoryRequest):
+def story(req: StoryRequest, player: str = Depends(logged_in)):
+    own_data(player, req.player_id)
     if MOCK:
         return mock.story(req.weak_sounds, req.interests)
     try:
@@ -91,21 +116,38 @@ def story(req: StoryRequest):
 def progress(
     player_id: str = Path(..., min_length=1, max_length=64),
     game: str | None = Query(None, pattern=r"^[a-z_]{1,32}$"),  # one game only; omit for all games
+    player: str = Depends(logged_in),
 ):
+    own_data(player, player_id)
     if MOCK:
         return mock.progress(player_id)
     return {"sessions": db.sessions(player_id, game)}
 
 
-# Players are plain storage (no AI to wait for), so they are real in mock mode too.
-@app.post("/players", response_model=Player, status_code=201)
-def create_player(req: PlayerCreate):
+# Accounts are plain storage (no AI to wait for), so they are real in mock mode too.
+@app.post("/players", response_model=LoginResponse, status_code=201)
+def register(req: Register):
     try:
-        return db.create_player(req.name, req.interests)
+        player = db.create_account(req.name, req.password, req.interests)
     except db.NameTaken:
         raise HTTPException(409, "That name is already taken")
+    return {**player, "token": db.start_login(player["player_id"])}
 
 
-@app.get("/players", response_model=PlayersResponse)
-def list_players():
-    return {"players": db.list_players()}
+@app.post("/login", response_model=LoginResponse)
+def login(req: Login):
+    player = db.check_password(req.name, req.password)
+    if player is None:
+        raise HTTPException(401, "Wrong name or password")
+    return {**player, "token": db.start_login(player["player_id"])}
+
+
+@app.post("/logout", status_code=204)
+def logout(creds: HTTPAuthorizationCredentials | None = Depends(bearer)):
+    if creds:
+        db.end_login(creds.credentials)
+
+
+@app.get("/me", response_model=Player)
+def me(player: str = Depends(logged_in)):
+    return db.get_player(player)

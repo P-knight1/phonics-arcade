@@ -13,7 +13,7 @@ The API contract is section 4 of [HANDOFF.md](../HANDOFF.md). Read the **"Propos
 | Scoring: sounds compared, accuracy, error type | ✅ Done | Pure functions, tested. |
 | Text → sounds (espeak-ng) | ✅ Done | Bundled, so nothing to install. British English. |
 | Debug mode through the real pipeline (`heard_text`) | ✅ Done | Typed answers are scored, saved and adapt the level. |
-| Player profiles (`/players`): nickname + interests, no password | ✅ Done | Real in both modes. |
+| Accounts: register / login / logout with a password, login tokens | ✅ Done | Each player sees only their own data. Real in both modes. |
 | Progress saved per player (SQLite) + `/progress` | ✅ Done | Per day: word accuracy, phoneme accuracy, speed, errors. Filter by game. |
 | Adaptive `/next-exercise` | ✅ Done for Word Flash | Needs a content file per game (see Content). |
 | `/story` via vLLM | 🟡 Built, not tried on a real model | Needs the droplet. Returns `503` until then. |
@@ -43,27 +43,41 @@ Then open **http://localhost:8000/docs** to try every endpoint in the browser. `
 
 ## 3. Frontend A: shell, Word Flash, Sound Surgery
 
-### Player select
-Players are **profiles without passwords**, saved on the server, so they work on any device:
+### Accounts: register, log in, log out
+Players have an **account with a nickname and password**. Logging in gives a **token**. Send it with every request, and the backend only ever shows that player their own data.
 
 ```js
-// List for the player-select screen
-const { players } = await (await fetch(`${API_BASE_URL}/players`)).json();
-// → [{ player_id: "3f2a…", name: "Sam", interests: ["football"] }, …]
-
-// "New player" form
-const r = await fetch(`${API_BASE_URL}/players`, {
+// Register (also logs you in)
+let r = await fetch(`${API_BASE_URL}/players`, {
   method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name: "Sam", interests: ["football", "space"] }),
+  body: JSON.stringify({ name: "Sam", password: "at least 8 chars", interests: ["football"] }),
 });
-// 201 → the new player · 409 → name taken (names are unique, ignoring case) · 422 → empty or too long
+// 201 → { player_id, name, interests, token } · 409 → name taken (ignoring case) · 422 → see the rules below
+
+// Log in
+r = await fetch(`${API_BASE_URL}/login`, {
+  method: "POST", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ name: "Sam", password: "…" }),
+});
+// 200 → { player_id, name, interests, token } · 401 → wrong name or password
+
+const { player_id, token } = await r.json();
+const auth = { Authorization: `Bearer ${token}` };   // add to EVERY request below
+
+// Page reload: check the saved token still works and get the profile back
+r = await fetch(`${API_BASE_URL}/me`, { headers: auth });  // 200 → { player_id, name, interests } · 401 → show login
+
+// Log out
+await fetch(`${API_BASE_URL}/logout`, { method: "POST", headers: auth });  // 204
 ```
 
-- `name`: 1–30 characters. `interests`: up to 5, each up to 40 characters.
-- Ask for a **nickname**, not a real name: the player list is visible to anyone using the app.
-- Remember the chosen `player_id` in the browser (localStorage), so the player doesn't pick again on every visit. Send it on every call.
-- `/players` stores data for real in mock mode too: there's no AI involved, so nothing to fake.
-- No editing or deleting yet. Ask Backend if you need it.
+- `name`: 1–30 characters, a **nickname** (no real names needed). `password`: 8–128 characters. `interests`: up to 5, each up to 40 characters.
+- Keep `token` and `player_id` in `sessionStorage` (logged out when the tab closes) or `localStorage` (stays logged in). Logins expire after 30 days.
+- There's **no list of players**: nobody can see who else has an account.
+- **`401`** = not logged in, or the login expired → show the login screen. **`403`** = you sent another player's `player_id` → a frontend bug.
+- Accounts are real in mock mode too, so the login flow works from Day 1. In mock mode, game data is still fake.
+- Until the droplet API has HTTPS (Day 3), passwords travel unencrypted over the internet, so only use **throwaway test passwords**. On localhost this doesn't matter.
+- There's no password reset or account deletion yet. Ask Backend if you need it.
 
 ### Sending an answer
 Every answer goes to `POST /score` as `multipart/form-data`:
@@ -71,12 +85,12 @@ Every answer goes to `POST /score` as `multipart/form-data`:
 ```js
 const form = new FormData();
 form.append("target", "dog");                 // what the player should say
-form.append("player_id", playerId);           // always: without it nothing is saved
 form.append("game", "word_flash");            // lowercase letters and _ only
 form.append("shown_at_ms", String(shownAt));  // Date.now() when the word appeared
 form.append("audio", blob, "answer.webm");    // from MediaRecorder (Safari gives mp4: fine)
-const result = await (await fetch(`${API_BASE_URL}/score`, { method: "POST", body: form })).json();
+const result = await (await fetch(`${API_BASE_URL}/score`, { method: "POST", body: form, headers: auth })).json();
 ```
+Logged in (`auth` header sent), the attempt is saved to that player. Without it, the answer is scored but not saved.
 
 | Situation | Send |
 |---|---|
@@ -89,7 +103,7 @@ What to show: `correct`, `heard` ("you said *bog*"), and `error_type` as friendl
 
 ### The round loop (Word Flash)
 ```
-items = POST /next-exercise { player_id, game: "word_flash", history: [] }
+items = POST /next-exercise { player_id, game: "word_flash", history: [] }        (with the auth header)
 loop:
     for each word in items: show it for display_ms, then hide it → record → POST /score → keep the result
     next = POST /next-exercise { player_id, game, history: <this round's /score results> }
@@ -105,6 +119,7 @@ Agree with Content on how one item stores both the prompt and the answer. A simp
 
 ### Errors
 All errors look like `{"detail": "..."}`.
+- `401`: not logged in or the login expired → login screen. `403`: another player's `player_id`.
 - `422`: bad input (the detail says which field).
 - `404` on `/next-exercise`: no content file for that game yet.
 - `503`: a model isn't connected yet. Fall back to the debug buttons.
@@ -124,7 +139,7 @@ Items come from `/next-exercise` with `game: "echo_chain"` once Content adds `co
 **Open: playing the sounds.** Browser text-to-speech says isolated sounds badly. Agree with Content on recorded clips or syllable-only chains.
 
 ### Progress Dashboard
-`GET /progress/{player_id}` → one entry per day:
+`GET /progress/{player_id}` (with the auth header, your own `player_id`) → one entry per day:
 ```json
 { "date": "2026-10-14", "accuracy": 0.72, "phoneme_accuracy": 0.86, "avg_response_ms": 1650, "errors": { "letter_reversal": 4, "missing_sound": 2 } }
 ```
@@ -139,7 +154,7 @@ Items come from `/next-exercise` with `game: "echo_chain"` once Content adds `co
 Mock mode returns 5 improving days, so you can build the charts now.
 
 ### Story Recall
-`POST /story` with `{ "player_id": "…" }` is enough: empty `weak_sounds` and `interests` are filled from the player's recorded attempts and profile. The reply is `{ story, questions: [{ q, answer }] }`. To read the story aloud, send it through `/score` one sentence at a time (`target` = the sentence). Checking spoken answers to the questions is still open (section 7). It returns `503` until the droplet's language model is connected: use mock mode until then.
+`POST /story` with `{ "player_id": "…" }` and the auth header is enough: empty `weak_sounds` and `interests` are filled from the player's recorded attempts and profile. The reply is `{ story, questions: [{ q, answer }] }`. To read the story aloud, send it through `/score` one sentence at a time (`target` = the sentence). Checking spoken answers to the questions is still open (section 7). It returns `503` until the droplet's language model is connected: use mock mode until then.
 
 ---
 

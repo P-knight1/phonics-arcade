@@ -19,21 +19,25 @@ def test_score_without_audio_or_text_is_no_response(mock_client):
     assert mock_client.post("/score", data={"target": "dog"}).json()["error_type"] == "no_response"
 
 
-def test_next_exercise(mock_client):
+def test_next_exercise(mock_client, login):
+    pid, auth = login(mock_client)
     hist = [{"heard": "bog", "target_phonemes": ["d"], "heard_phonemes": ["b"], "correct": False,
              "phoneme_accuracy": 0.0, "response_ms": 1000, "error_type": "letter_reversal"}]
-    r = mock_client.post("/next-exercise", json={"player_id": "p1", "game": "word_flash", "history": hist})
+    r = mock_client.post("/next-exercise", json={"player_id": pid, "game": "word_flash", "history": hist}, headers=auth)
     assert r.status_code == 200
     NextExerciseResponse.model_validate(r.json())
 
 
-def test_story(mock_client):
-    r = mock_client.post("/story", json={"player_id": "p1", "weak_sounds": ["b", "d"], "interests": ["football"]})
+def test_story(mock_client, login):
+    pid, auth = login(mock_client)
+    r = mock_client.post("/story", json={"player_id": pid, "weak_sounds": ["b", "d"], "interests": ["football"]},
+                         headers=auth)
     assert r.status_code == 200
     StoryResponse.model_validate(r.json())
 
 
-def test_progress(mock_client):
-    r = mock_client.get("/progress/p1")
+def test_progress(mock_client, login):
+    pid, auth = login(mock_client)
+    r = mock_client.get(f"/progress/{pid}", headers=auth)
     assert r.status_code == 200
     assert ProgressResponse.model_validate(r.json()).sessions

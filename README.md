@@ -15,7 +15,7 @@ A web app of short reading games that you play **with your voice**. The player r
 **Why it's new:** ordinary speech-to-text "corrects" what you say (you read *bog*, it writes *dog*). Scoring sound by sound with a phoneme model, plus stories generated for each player, wasn't practical before modern AI on large GPUs.
 
 ### What the player sees
-1. **Player select:** pick or create a player profile (nickname and interests, e.g. football; no password).
+1. **Log in or register:** nickname, password and interests (e.g. football). Each player only sees their own progress.
 2. **Game menu:** Word Flash · Sound Surgery · Echo Chain · Story Recall · Progress.
 3. **In a game:** a big word or prompt, a mic button, and instant feedback (✓, or "you said *bog*, try *d*"). It gets faster when you succeed and slower, repeating patterns, when you struggle.
 4. **Progress dashboard:** charts of accuracy, response time and error types across sessions.
@@ -119,7 +119,7 @@ backend/app/scoring.py   phoneme comparison, error types, weak sounds (pure func
 backend/app/g2p.py       text -> phonemes (espeak-ng, bundled; no install needed)
 backend/app/speech.py    audio -> phonemes: AI & Infrastructure plugs in here
 backend/app/brain.py     adaptive next exercise (rules) + stories (LLM on vLLM)
-backend/app/db.py        SQLite: players, attempts and levels (file in backend/data/, git-ignored)
+backend/app/db.py        SQLite: accounts, logins, attempts and levels (file in backend/data/, git-ignored)
 backend/app/schemas.py   Pydantic models = the API contract
 content/                 word lists and prompts (owned by Content)
 frontend/                game UI (framework still to be picked by Frontend A)

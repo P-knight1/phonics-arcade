@@ -19,3 +19,17 @@ def mock_client(monkeypatch):
 def client(monkeypatch):
     monkeypatch.setattr(main, "MOCK", False)
     return TestClient(main.app)
+
+
+@pytest.fixture
+def login():
+    """login(client, name) -> (player_id, auth headers). Registers the player the first time."""
+    cache = {}
+
+    def _login(client, name="p1"):
+        if name not in cache:
+            r = client.post("/players", json={"name": name, "password": "test-password"}).json()
+            cache[name] = (r["player_id"], {"Authorization": f"Bearer {r['token']}"})
+        return cache[name]
+
+    return _login

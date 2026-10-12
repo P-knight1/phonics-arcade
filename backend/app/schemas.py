@@ -61,14 +61,24 @@ class ProgressResponse(BaseModel):
     sessions: list[Session]
 
 
-class PlayerCreate(BaseModel):
-    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=30)]  # a nickname
+Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=30)]  # a nickname
+Password = Annotated[str, Field(min_length=8, max_length=128)]
+
+
+class Login(BaseModel):
+    name: Name
+    password: Password
+
+
+class Register(Login):
     interests: list[Interest] = Field(default=[], max_length=5)
 
 
-class Player(PlayerCreate):
+class Player(BaseModel):
     player_id: str
+    name: str
+    interests: list[str]
 
 
-class PlayersResponse(BaseModel):
-    players: list[Player]
+class LoginResponse(Player):
+    token: str  # send as "Authorization: Bearer <token>"
