@@ -1,41 +1,39 @@
-import os
+from app.schemas import NextExerciseResponse, ProgressResponse, ScoreResponse, StoryResponse
 
-os.environ["MOCK_MODE"] = "1"
-
-from fastapi.testclient import TestClient  # noqa: E402
-
-from app.main import app  # noqa: E402
-from app.schemas import NextExerciseResponse, ProgressResponse, ScoreResponse, StoryResponse  # noqa: E402
-
-client = TestClient(app)
+AUDIO = {"audio": ("a.webm", b"x", "audio/webm")}
 
 
-def test_score():
+def test_score(mock_client):
     for _ in range(20):  # mock is random; hit every branch
-        r = client.post("/score", data={"target": "dog", "shown_at_ms": "0"}, files={"audio": ("a.webm", b"x", "audio/webm")})
+        r = mock_client.post("/score", data={"target": "dog", "shown_at_ms": "0"}, files=AUDIO)
         assert r.status_code == 200
         ScoreResponse.model_validate(r.json())
 
 
-def test_score_requires_audio():
-    assert client.post("/score", data={"target": "dog"}).status_code == 422
+def test_score_heard_text_is_deterministic(mock_client):
+    r = mock_client.post("/score", data={"target": "dog", "heard_text": "bog"})
+    assert r.json()["error_type"] == "letter_reversal" and r.json()["heard"] == "bog"
 
 
-def test_next_exercise():
+def test_score_without_audio_or_text_is_no_response(mock_client):
+    assert mock_client.post("/score", data={"target": "dog"}).json()["error_type"] == "no_response"
+
+
+def test_next_exercise(mock_client):
     hist = [{"heard": "bog", "target_phonemes": ["d"], "heard_phonemes": ["b"], "correct": False,
              "phoneme_accuracy": 0.0, "response_ms": 1000, "error_type": "letter_reversal"}]
-    r = client.post("/next-exercise", json={"player_id": "p1", "game": "word_flash", "history": hist})
+    r = mock_client.post("/next-exercise", json={"player_id": "p1", "game": "word_flash", "history": hist})
     assert r.status_code == 200
     NextExerciseResponse.model_validate(r.json())
 
 
-def test_story():
-    r = client.post("/story", json={"player_id": "p1", "weak_sounds": ["b", "d"], "interests": ["football"]})
+def test_story(mock_client):
+    r = mock_client.post("/story", json={"player_id": "p1", "weak_sounds": ["b", "d"], "interests": ["football"]})
     assert r.status_code == 200
     StoryResponse.model_validate(r.json())
 
 
-def test_progress():
-    r = client.get("/progress/p1")
+def test_progress(mock_client):
+    r = mock_client.get("/progress/p1")
     assert r.status_code == 200
     assert ProgressResponse.model_validate(r.json()).sessions

@@ -57,9 +57,14 @@ cd phonics-arcade
 cp .env.example .env        # Windows PowerShell: copy .env.example .env
 ```
 
-## 2. Run the mock API (no GPU needed)
+## 2. Run the backend (no GPU needed)
 
-The mock API returns fake data that matches the contract, so frontend work never waits on the real AI.
+Two modes, set by `MOCK_MODE` in `.env`:
+
+| `MOCK_MODE` | What you get | Use it for |
+|---|---|---|
+| `1` (default) | Fake data on every endpoint, no setup | Frontend work |
+| `0` | **Real** scoring, progress and adaptive levels, saved in SQLite. Typed answers (`heard_text`) work fully. Audio scoring and stories return `503` until the AMD droplet is connected. | Integration, backend work |
 
 **With Docker**
 ```bash
@@ -73,7 +78,7 @@ macOS / Linux:
 cd backend
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-MOCK_MODE=1 uvicorn app.main:app --reload
+uvicorn app.main:app --reload --env-file ../.env
 ```
 
 Windows PowerShell (one line at a time; `&&` does not work there):
@@ -81,18 +86,10 @@ Windows PowerShell (one line at a time; `&&` does not work there):
 cd backend
 python -m venv .venv
 .venv\Scripts\pip install -r requirements.txt
-$env:MOCK_MODE="1"; .venv\Scripts\python -m uvicorn app.main:app --reload
+.venv\Scripts\python -m uvicorn app.main:app --reload --env-file ..\.env
 ```
 
-Then open **http://localhost:8000/docs**. You can call every endpoint from that page.
-
-| Endpoint | What it does (mock) |
-|---|---|
-| `GET /health` | `{"ok": true, "mock": true}` |
-| `POST /score` | Form fields `target` and `audio` (any file), optional `shown_at_ms`. Returns a random right or wrong result. |
-| `POST /next-exercise` | Picks the level from recent history and returns words |
-| `POST /story` | Returns a fixed story with questions |
-| `GET /progress/{player_id}` | Returns 5 fake sessions that improve over time |
+Then open **http://localhost:8000/docs**. You can try every endpoint from that page. `GET /health` shows which mode is running.
 
 ## 3. Run the tests
 
@@ -101,30 +98,34 @@ cd backend
 python -m pytest
 ```
 
-## 4. Rules for working together
+## 4. How your part plugs into the backend
+
+**Read [docs/backend-guide.md](docs/backend-guide.md).** It covers what's built, what's missing, and step-by-step instructions with examples for each role.
+
+## 5. Rules for working together
 
 - **Never commit secrets.** API keys, tokens, droplet IPs and SSH keys go in `.env` only (it is git-ignored). Never paste them into code, the README, issues, PRs or Discord. If one leaks, tell the team and rotate it straight away.
-- **One branch per person or feature.** Merge into `main` at least once a day. `main` must always run.
+- **One branch per person or feature.** Merge into `main` at least once a day. `main` must always run, and tests must pass.
 - **The API contract (HANDOFF.md section 4) is frozen.** Changing it needs the whole team to agree, because frontend and backend both depend on it.
 - **Frontend code uses one API client** (`frontend/src/api.ts`) that reads the base URL from config. No hard-coded URLs.
 - **Every game supports debug mode** (`?debug=1`): "✓ Said it right" / "✗ Said it wrong" buttons and a box for typing what was heard.
 
-## 5. Where things live
+## 6. Where things live
 
 ```
-backend/app/main.py      routes (MOCK_MODE=1 switches to mock data)
+backend/app/main.py      routes; MOCK_MODE=1 switches every endpoint to mock data
 backend/app/mock.py      fake responses
-backend/app/scoring.py   phoneme comparison and error types (pure functions, tested)
+backend/app/scoring.py   phoneme comparison, error types, weak sounds (pure functions)
+backend/app/g2p.py       text -> phonemes (espeak-ng, bundled; no install needed)
+backend/app/speech.py    audio -> phonemes: AI & Infrastructure plugs in here
+backend/app/brain.py     adaptive next exercise (rules) + stories (LLM on vLLM)
+backend/app/db.py        SQLite: attempts and levels (file in backend/data/, git-ignored)
 backend/app/schemas.py   Pydantic models = the API contract
-content/                 word lists, sound pairs, syllables, prompt templates (JSON)
+content/                 word lists and prompts (owned by Content)
 frontend/                game UI (framework still to be picked by Frontend A)
 infra/                   droplet setup script
 ```
 
-## 6. Open questions for the team (decide on Day 1)
+## 7. Open questions for the team
 
-1. Add an optional `player_id` (and `game`) to `/score` so the server can record progress?
-2. Add an optional `heard_text` field to `/score` so debug mode runs through the real scoring code?
-3. Have the server measure response time from the audio (speech onset) instead of using `shown_at_ms`?
-4. Judges need a live URL: frontend on Vercel, droplet API behind HTTPS. Who owns this?
-5. Keep the droplet up during judging (credit budget), or make the app fail gracefully?
+Listed in section 7 of [docs/backend-guide.md](docs/backend-guide.md). Decide them on Day 1.

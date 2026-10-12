@@ -1,0 +1,12 @@
+Write a short, cheerful story for a young reader who is practising reading aloud.
+
+Rules:
+- 60 to 100 words. Short sentences. Simple, everyday words a child can sound out.
+- Use many words that contain these sounds (IPA symbols): $weak_sounds
+- Set the story around these interests: $interests
+- Nothing scary, violent, sad or unkind.
+
+Then write 3 simple questions about the story. Each answer must be one or two words taken from the story.
+
+Reply with JSON only, in this shape:
+{"story": "...", "questions": [{"q": "...", "answer": "..."}]}

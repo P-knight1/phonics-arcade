@@ -1,0 +1,10 @@
+{
+  "_note": "v0 starter list so the backend runs. Content owner (role 5) replaces it. Levels go easiest first; level number = position (1-based).",
+  "levels": [
+    {"focus": "short a words", "display_ms": 2000, "items": ["cat", "hat", "mat", "sat", "bat", "map", "cap", "pan", "dad", "bag", "tap", "jam"]},
+    {"focus": "short i and o words", "display_ms": 1700, "items": ["big", "dig", "pin", "sit", "lip", "dip", "dog", "hot", "pot", "box", "log", "bob"]},
+    {"focus": "short e and u words", "display_ms": 1500, "items": ["bed", "red", "pen", "net", "den", "web", "bug", "bun", "cub", "dug", "mud", "tub"]},
+    {"focus": "sh, ch and th", "display_ms": 1300, "items": ["ship", "shop", "fish", "dish", "chip", "chin", "much", "rich", "thin", "this", "that", "bath"]},
+    {"focus": "consonant blends", "display_ms": 1100, "items": ["frog", "stop", "crab", "drum", "flag", "swim", "black", "clap", "step", "trip", "bend", "desk"]}
+  ]
+}

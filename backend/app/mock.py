@@ -4,14 +4,14 @@ from datetime import date, timedelta
 
 from . import scoring
 
-# shortcut: one letter = one phoneme. Real G2P (espeak) lands in speech.py.
+# shortcut: one letter = one phoneme, so mock mode needs no espeak. Real mode uses g2p.py.
 def fake_phonemes(word: str) -> list[str]:
     return list(word.lower().replace(" ", ""))
 
 
-def score(target: str, shown_at_ms: int | None) -> dict:
+def score(target: str, shown_at_ms: int | None, heard_text: str | None = None) -> dict:
     target_ph = fake_phonemes(target)
-    heard_ph = random.choice([
+    heard_ph = fake_phonemes(heard_text) if heard_text is not None else random.choice([
         target_ph,                                                  # correct
         [{"b": "d", "d": "b"}.get(p, p) for p in target_ph],        # b/d swap
         target_ph[1:],                                              # dropped first sound
@@ -19,11 +19,11 @@ def score(target: str, shown_at_ms: int | None) -> dict:
         [],                                                         # silence
     ])
     return {
-        "heard": "".join(heard_ph),
+        "heard": heard_text if heard_text is not None else "".join(heard_ph),
         "target_phonemes": target_ph,
         "heard_phonemes": heard_ph,
         "response_ms": random.randint(600, 3000) if shown_at_ms is not None else None,
-        **scoring.score(target_ph, heard_ph),
+        **scoring.score(target_ph, heard_ph, target, heard_text or ""),
     }
 
 
@@ -34,7 +34,7 @@ def next_exercise(game: str, history: list) -> dict:
     return {
         "game": game,
         "level": level,
-        "items": random.sample(["bat", "dad", "bed", "dog", "big", "dip", "bud", "dab"], 3),
+        "items": random.sample(["bat", "dad", "bed", "dog", "big", "dip", "bud", "dab"], 5),
         "display_ms": {1: 2000, 2: 1500, 3: 1200}[level],
         "reason": "practising b/d",
     }

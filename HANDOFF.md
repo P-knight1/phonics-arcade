@@ -84,6 +84,19 @@ Response:
 { "sessions": [ { "date": "2026-10-14", "accuracy": 0.72, "avg_response_ms": 1650, "errors": { "letter_reversal": 4, "missing_sound": 2 } } ] }
 ```
 
+### Proposed additions (backward compatible; the backend already supports them; confirm on Day 1)
+Nothing above changes. Clients that ignore these keep working.
+
+- `/score` takes 3 **optional** form fields:
+  - `player_id`: records the attempt, which `/progress` and the adaptive brain need. Without it, the attempt is scored but not saved.
+  - `game`: e.g. `word_flash`, stored with the attempt.
+  - `heard_text`: debug mode. The typed text is scored instead of audio, so the whole pipeline (scoring, progress, levels) works with no mic and no GPU.
+- `/score` with **no `audio` and no `heard_text`** means the player didn't answer (e.g. the word disappeared): `error_type: "no_response"`.
+- `response_ms` is `null` when `shown_at_ms` isn't sent. `shown_at_ms` is the browser's `Date.now()` when the prompt appeared. `avg_response_ms` in `/progress` is `null` on a day with no response times.
+- `/next-exercise` `history` = the `/score` results of **the round just played** (empty on the first call). The server remembers each player's level per game.
+- `/story` with an empty `weak_sounds` uses the player's weak sounds from their recorded attempts.
+- `accuracy` in `/progress` = word accuracy (share of attempts fully correct) per day. `errors` counts only mistakes.
+
 ## 5. Mock-first rule
 
 Day 1 priority for the backend is a **mock server** implementing every endpoint above with fake but schema-valid data (random `correct`, fixed story, etc.). Frontend work must never wait on real AI.
