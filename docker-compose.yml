@@ -1,0 +1,8 @@
+services:
+  backend:
+    build: ./backend
+    ports: ["8000:8000"]
+    env_file: .env
+    environment:
+      MOCK_MODE: ${MOCK_MODE:-1}
+  # frontend: add once frontend/ has a Dockerfile (Frontend A picks the framework)
