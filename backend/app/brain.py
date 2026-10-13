@@ -10,7 +10,7 @@ from collections import Counter
 from pathlib import Path
 from string import Template
 
-from openai import OpenAI, OpenAIError
+from openai import BadRequestError, OpenAI, OpenAIError
 from pydantic import ValidationError
 
 from . import db, g2p
@@ -98,15 +98,14 @@ def _complete(prompt: str) -> str:
     if not (base_url and model):
         raise LLMUnavailable("VLLM_BASE_URL / VLLM_MODEL are not set")
     client = OpenAI(base_url=base_url, api_key=api_key or "none", timeout=60)
+    request = {"model": model, "messages": [{"role": "user", "content": prompt}], "temperature": 0.7, "max_tokens": 800}
     try:
-        resp = client.chat.completions.create(
-            model=model,
-            messages=[{"role": "user", "content": prompt}],
+        try:
             # vLLM structured output: the model can only produce JSON in this shape.
-            response_format={"type": "json_schema", "json_schema": {"name": "story", "schema": STORY_SCHEMA}},
-            temperature=0.7,
-            max_tokens=800,
-        )
+            resp = client.chat.completions.create(
+                **request, response_format={"type": "json_schema", "json_schema": {"name": "story", "schema": STORY_SCHEMA}})
+        except BadRequestError:  # some hosted dev APIs lack schema output; the prompt asks for JSON and story() checks it
+            resp = client.chat.completions.create(**request)
     except OpenAIError as e:
         raise LLMUnavailable(f"LLM request failed: {type(e).__name__}") from e
     return resp.choices[0].message.content or ""
@@ -119,7 +118,9 @@ def story(player_id: str, weak: list[str], interests: list[str]) -> dict:
         interests = player["interests"]
     template = Template((CONTENT_DIR / "prompts" / "story.txt").read_text(encoding="utf-8"))
     prompt = template.safe_substitute(weak_sounds=", ".join(weak) or "any", interests=", ".join(interests) or "animals")
+    text = _complete(prompt)
+    text = text[text.find("{"): text.rfind("}") + 1]  # models without schema output may wrap JSON in prose or ``` fences
     try:
-        return StoryResponse.model_validate_json(_complete(prompt)).model_dump()
+        return StoryResponse.model_validate_json(text).model_dump()
     except ValidationError as e:
         raise LLMUnavailable("LLM returned a story in the wrong shape") from e

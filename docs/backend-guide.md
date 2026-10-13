@@ -21,7 +21,7 @@ The API contract is section 4 of [HANDOFF.md](../HANDOFF.md). Read the **"Propos
 | **Audio → sounds (`speech.py`)** | ❌ **Missing** | AI & Infrastructure. Audio scoring returns `503` until then. |
 | Content for Sound Surgery and Echo Chain | ❌ Missing | Content. |
 | Docker image | ✅ Builds and runs | Tested on Linux x86-64 (WSL): all 34 tests pass in the container. GPU support comes with `speech.py` (section 5). |
-| HTTPS for the API, live URL for judges | ❌ Planned | HTTPS: AI & Infrastructure, Day 3. Vercel: Frontend A, Day 4 (HANDOFF.md section 8.1). |
+| HTTPS for the API, live URL for judges | ❌ Planned | HTTPS: AI & Infrastructure, Day 3. Vercel: Frontend, Day 4 (HANDOFF.md section 8.1). |
 | Checking spoken Story Recall answers | ❌ Not designed | Needs a team decision (section 7). |
 
 ---
@@ -40,9 +40,26 @@ uvicorn app.main:app --reload --env-file ../.env
 ```
 Then open **http://localhost:8000/docs** to try every endpoint in the browser. `GET /health` shows the mode.
 
+### Stories without the droplet: a local AI model
+`/story` talks to the language model through the standard OpenAI-style API, so any compatible server works with **no code changes**. Until the droplet is up, anyone with a capable computer can use [Ollama](https://ollama.com) (version 0.5 or newer) on your own computer:
+
+```bash
+ollama pull qwen2.5:3b        # same model family as the droplet; ~2 GB. Strong machine: qwen2.5:7b
+```
+
+Then in your `.env` (never committed):
+```
+MOCK_MODE=0
+VLLM_BASE_URL=http://localhost:11434/v1
+VLLM_API_KEY=ollama
+VLLM_MODEL=qwen2.5:3b
+```
+
+Run the backend with Python, not Docker: inside a container, `localhost` is the container, so it can't reach Ollama. This is **for development only**. The demo must use the AMD droplet, and a smaller model writes differently, so stories get checked again on the droplet (Day 3). Switching is only `.env`: put the droplet's `VLLM_BASE_URL`, `VLLM_API_KEY` and `VLLM_MODEL` in place of the Ollama values (get them from AI & Infrastructure privately, never in chat or git).
+
 ---
 
-## 3. Frontend A: shell, Word Flash, Sound Surgery
+## 3. Frontend (member 3): shell, accounts, Word Flash, Sound Surgery
 
 ### Accounts: register, log in, log out
 Players have an **account with a nickname and password**. Logging in gives a **token**. Send it with every request, and the backend only ever shows that player their own data.
@@ -148,7 +165,7 @@ Read the base URL from config (`API_BASE_URL`). Vite only exposes variables that
 
 ---
 
-## 4. Frontend B: Echo Chain, Progress Dashboard (Beat Reader only if time allows)
+## 4. Frontend (member 4): Echo Chain, Progress Dashboard, Story Recall
 
 ### Echo Chain
 Send the **whole chain** as one target, separated by spaces: `target: "bah dee koo"`. The player's version is compared sound by sound, so `"bah bee koo"` → `letter_reversal`, accuracy 0.83.
@@ -176,7 +193,7 @@ Mock mode returns 5 improving days, so you can build the charts now.
 
 ---
 
-## 5. AI & Infrastructure (role 1)
+## 5. AI, input and cloud (members 1 and 2)
 
 ### Your one integration point: `speech.recognize()`
 [backend/app/speech.py](../backend/app/speech.py) holds the exact interface in its docstring. In short:
@@ -213,7 +230,7 @@ Run your model on recorded clips of the starter words in `content/word_flash.jso
 
 ---
 
-## 6. Content, research and pitch (role 5)
+## 6. Content and pitch (members 3 and 4; pitch: member 4)
 
 ### Word lists: one file per game, `content/<game>.json`
 ```json
@@ -252,5 +269,5 @@ Made-up syllables are read oddly ("ki" → `k aɪ`). Spell them the way they sho
 3. Echo Chain audio: recorded clips, or syllables only?
 4. Story Recall: spoken answers like "it was red" can't be checked by `/score`. Add an endpoint (Whisper + a loose match), or check answers with buttons?
 5. Response time: keep `shown_at_ms` (includes upload time) or measure speech onset in the audio?
-6. The plan gives HTTPS to AI & Infrastructure (Day 3) and Vercel to Frontend A (Day 4). Agree? Keep the droplet up during judging?
-7. Story Recall has no owner in the roles table. The day-by-day plan (HANDOFF.md section 8.1) gives it to Frontend B, because Beat Reader is optional. Agree?
+6. The plan gives HTTPS to AI & Infrastructure (Day 3) and Vercel to Frontend (Day 4). Agree? Keep the droplet up during judging?
+7. Roles: members 3 + 4 on frontend, games and research (split by folder, member 4 also the pitch), members 1 + 2 on input, AI and cloud (HANDOFF.md sections 7 and 8.1).

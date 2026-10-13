@@ -27,7 +27,7 @@ A web app of short reading games that you play **with your voice**. The player r
 | Echo Chain | Repeats a growing chain of sounds or syllables | Must |
 | Story Recall | Reads an AI story built from their weak sounds and interests, then answers questions by voice | Should |
 | Progress Dashboard | Sees improvement over sessions | Must |
-| Beat Reader | Syllables on a beat | Cut unless there is spare time |
+| Beat Reader | Syllables on a beat | Cut |
 
 ### How it fits together
 ```
@@ -122,7 +122,7 @@ backend/app/brain.py     adaptive next exercise (rules) + stories (LLM on vLLM)
 backend/app/db.py        SQLite: accounts, logins, attempts and levels (file in backend/data/, git-ignored)
 backend/app/schemas.py   Pydantic models = the API contract
 content/                 word lists and prompts (owned by Content)
-frontend/                game UI (framework still to be picked by Frontend A)
+frontend/                game UI: React + TypeScript on Vite (see section 2a)
 infra/                   droplet setup script
 ```
 
