@@ -3,7 +3,7 @@ import { useState } from "react";
 interface Props {
   /** What the player should say. */
   target: string;
-  /** Called with the text to score in place of audio. Empty text means no answer. */
+  /** Called with the text to score in place of audio. */
   onAnswer(heardText: string): void;
   disabled?: boolean;
 }
@@ -24,7 +24,8 @@ export default function DebugPanel({ target, onAnswer, disabled }: Props) {
         <button className="secondary" onClick={() => answer(target)} disabled={disabled}>
           ✓ Said it right
         </button>
-        <button className="secondary" onClick={() => answer(typed.trim())} disabled={disabled}>
+        {/* "Wrong" needs to know what was heard; "I missed it" is the no-answer button. */}
+        <button className="secondary" onClick={() => answer(typed.trim())} disabled={disabled || !typed.trim()}>
           ✗ Said it wrong
         </button>
       </div>

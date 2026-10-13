@@ -11,6 +11,18 @@ export default function App() {
 
   if (session.status === "loading") return <p className="center-note">Loading…</p>;
   if (session.status === "out") return <AuthScreen />;
+  if (session.status === "offline") {
+    return (
+      <main className="auth">
+        <p className="error" role="alert">
+          Can't reach the server right now. Your login is kept.
+        </p>
+        <button className="primary" onClick={session.retry} autoFocus>
+          Try again
+        </button>
+      </main>
+    );
+  }
 
   // Each game is its own page: replace a ComingSoon element with the real screen when it is ready.
   return (

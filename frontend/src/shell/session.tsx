@@ -6,9 +6,12 @@ const TOKEN_KEY = "phonics-arcade.token";
 type SessionState =
   | { status: "loading" }
   | { status: "out" }
+  | { status: "offline" } // a saved login exists, but the server could not be reached to check it
   | { status: "in"; player: api.Player; guest: boolean };
 
 interface SessionActions {
+  /** Checks the saved login again (after "offline"). */
+  retry(): void;
   logIn(name: string, password: string): Promise<void>;
   register(name: string, password: string, interests: string[]): Promise<void>;
   playAsGuest(): Promise<void>;
@@ -31,24 +34,26 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Page reload: check that the saved token still works and get the profile back.
-  useEffect(() => {
-    let cancelled = false;
-    api.setOnUnauthorized(clear);
+  // Only a 401 means the login is gone; if the server is just unreachable, keep the login and offer a retry.
+  const restore = useCallback(() => {
     const saved = localStorage.getItem(TOKEN_KEY);
     if (!saved) {
       setState({ status: "out" });
-    } else {
-      api.setToken(saved);
-      api.me().then(
-        (player) => !cancelled && setState({ status: "in", player, guest: false }),
-        () => !cancelled && clear(),
-      );
+      return;
     }
-    return () => {
-      cancelled = true;
-      api.setOnUnauthorized(null);
-    };
+    setState({ status: "loading" });
+    api.setToken(saved);
+    api.me().then(
+      (player) => setState({ status: "in", player, guest: false }),
+      (e) => (e instanceof api.ApiError && e.status === 401 ? clear() : setState({ status: "offline" })),
+    );
   }, [clear]);
+
+  useEffect(() => {
+    api.setOnUnauthorized(clear);
+    restore();
+    return () => api.setOnUnauthorized(null);
+  }, [clear, restore]);
 
   const actions = useMemo<SessionActions>(() => {
     const start = (result: api.LoginResult, guest: boolean) => {
@@ -58,6 +63,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setState({ status: "in", player: toPlayer(result), guest });
     };
     return {
+      retry: restore,
       logIn: async (name, password) => start(await api.login(name, password), false),
       register: async (name, password, interests) => start(await api.register(name, password, interests), false),
       playAsGuest: async () => start(await api.startGuest(), true),
@@ -71,7 +77,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         clear();
       },
     };
-  }, [clear]);
+  }, [clear, restore]);
 
   const value = useMemo(() => ({ ...state, ...actions }), [state, actions]);
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

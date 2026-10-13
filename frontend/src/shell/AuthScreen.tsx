@@ -40,6 +40,10 @@ export default function AuthScreen() {
       void run(() => session.logIn(name, password));
     } else {
       const list = interests.split(",").map((s) => s.trim()).filter(Boolean).slice(0, 5);
+      if (list.some((s) => s.length > 40)) {
+        setError("Each thing you like can be up to 40 characters.");
+        return;
+      }
       void run(() => session.register(name, password, list));
     }
   }
