@@ -91,6 +91,22 @@ python -m venv .venv
 
 Then open **http://localhost:8000/docs**. You can try every endpoint from that page. `GET /health` shows which mode is running.
 
+## 2a. Run the frontend (Node 20+)
+
+With the backend running (section 2):
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Then open http://localhost:5173. Add `?debug=1` for the placeholder answer buttons, e.g. http://localhost:5173/?debug=1.
+
+The API address comes from `VITE_API_BASE_URL` (`frontend/.env.development` points at `http://localhost:8000`). To use another backend, put that variable in `frontend/.env.local` (git-ignored).
+
+Adding a game: build it as a page under `frontend/src/games/<name>/` and swap it in for its `ComingSoon` route in `frontend/src/App.tsx`. Use `api.ts` for every backend call, `usePlayer()` for the logged-in player, and `useRecorder()` + `MicButton` + `DebugPanel` from `frontend/src/shell/` for answers ([WordFlash.tsx](frontend/src/games/word-flash/WordFlash.tsx) shows all of them together).
+
 ## 3. Run the tests
 
 ```bash
