@@ -1,0 +1,7 @@
+# Speech scoring: audio -> sounds. Not needed in mock mode or for typed (debug) answers.
+# Install PyTorch FIRST, the build that matches the machine:
+#   CPU (any laptop):  pip install torch --index-url https://download.pytorch.org/whl/cpu
+#   AMD GPU (droplet): pip install torch --index-url https://download.pytorch.org/whl/rocm<version>  (match the droplet's ROCm)
+# then: pip install -r requirements-speech.txt
+transformers==5.19.0
+av==19.0.1

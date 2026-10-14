@@ -31,9 +31,41 @@ def test_score_no_answer(client):
         assert (r["heard"], r["heard_phonemes"], r["error_type"]) == ("", [], "no_response")
 
 
-def test_score_audio_waits_for_speech_module(client):
+def test_score_audio_without_speech_packages_is_503(client, monkeypatch):
+    def unavailable(audio, ctype):
+        raise speech.SpeechUnavailable("speech packages not installed")
+
+    monkeypatch.setattr(speech, "recognize", unavailable)
     r = client.post("/score", data={"target": "dog"}, files={"audio": ("a.webm", b"x", "audio/webm")})
     assert r.status_code == 503
+
+
+def wav(seconds):
+    import io
+    import wave
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as w:
+        w.setnchannels(1), w.setsampwidth(2), w.setframerate(16000)
+        w.writeframes(b"\0\0" * int(16000 * seconds))
+    return buf.getvalue()
+
+
+def test_unreadable_audio_is_422(client):
+    pytest.importorskip("av")
+    r = client.post("/score", data={"target": "dog"}, files={"audio": ("a.webm", b"not audio", "audio/webm")})
+    assert r.status_code == 422
+
+
+def test_a_tap_on_the_mic_is_no_answer(client):
+    pytest.importorskip("av")  # decoded, but too short to need the model
+    r = client.post("/score", data={"target": "dog"}, files={"audio": ("a.wav", wav(0.1), "audio/wav")})
+    assert r.json()["error_type"] == "no_response"
+
+
+def test_right_answer_shows_the_target_as_heard(client, monkeypatch):
+    monkeypatch.setattr(speech, "recognize", lambda audio, ctype: ("", ["d", "ɒ", "ɡ"]))
+    r = client.post("/score", data={"target": "dog"}, files={"audio": ("a.webm", b"x", "audio/webm")})
+    assert (r.json()["correct"], r.json()["heard"]) == (True, "dog")
 
 
 def test_score_audio_uses_speech_module(client, monkeypatch):

@@ -18,7 +18,7 @@ The API contract is section 4 of [HANDOFF.md](../HANDOFF.md). Read the **"Propos
 | Progress saved per player (SQLite) + `/progress` | ✅ Done | Per day: word accuracy, phoneme accuracy, speed, errors. Filter by game. |
 | Adaptive `/next-exercise` | ✅ Done for Word Flash | Needs a content file per game (see Content). |
 | `/story` via vLLM | 🟡 Built, not tried on a real model | Needs the droplet. Returns `503` until then. |
-| **Audio → sounds (`speech.py`)** | ❌ **Missing** | AI & Infrastructure. Audio scoring returns `503` until then. |
+| Audio → sounds (`speech.py`) | 🟡 Works on CPU | b/d and other consonants detected from real webm audio. Vowels need accent tuning on real clips. GPU on the droplet: Day 3. |
 | Content for Sound Surgery and Echo Chain | ❌ Missing | Content. |
 | Docker image | ✅ Builds and runs | Tested on Linux x86-64 (WSL): all 34 tests pass in the container. GPU support comes with `speech.py` (section 5). |
 | HTTPS for the API, live URL for judges | ❌ Planned | HTTPS: AI & Infrastructure, Day 3. Vercel: Frontend, Day 4 (HANDOFF.md section 8.1). |
@@ -195,17 +195,22 @@ Mock mode returns 5 improving days, so you can build the charts now.
 
 ## 5. AI, input and cloud (members 1 and 2)
 
-### Your one integration point: `speech.recognize()`
-[backend/app/speech.py](../backend/app/speech.py) holds the exact interface in its docstring. In short:
-```python
-def recognize(audio: bytes, content_type: str) -> tuple[str, list[str]]:
-    return heard_text, heard_phonemes   # e.g. ("bog", ["b", "ɒ", "ɡ"])
+### Speech scoring: `speech.recognize()` (done, runs on CPU now)
+[backend/app/speech.py](../backend/app/speech.py) turns a recording into sounds with the phoneme model `facebook/wav2vec2-lv-60-espeak-cv-ft`:
+- **Audio:** webm/opus (Chrome, Firefox), mp4 (Safari) or wav, decoded with PyAV (it bundles ffmpeg, nothing to install).
+- **Device:** the AMD GPU when PyTorch's ROCm build is installed (it reports the GPU as `cuda`), otherwise the CPU. About 0.35 s per word on a laptop CPU.
+- **The model loads in the background when the backend starts** (real mode). The first start downloads about 1.3 GB.
+- **`heard`** is the target when the answer is right, and empty otherwise (the model gives sounds, not words), so the game shows the feedback message.
+- **Under 0.2 s of audio** counts as no answer. **Unreadable audio** → `422`. **Speech packages not installed** → `503`, and games fall back to the debug buttons.
+
+**Install** (not needed for mock mode or typed answers), from `backend/`:
+```bash
+pip install torch --index-url https://download.pytorch.org/whl/cpu        # laptop; the droplet uses the ROCm build
+pip install -r requirements-speech.txt
 ```
-- Audio arrives as webm/opus (Chrome, Firefox) or mp4 (Safari). Decode it with ffmpeg (in the image) to 16 kHz mono for the model.
-- Return the phonemes **raw**. The backend already strips stress and length marks and maps `ɡ`→`g`.
-- `heard_text`: Whisper writes the intended word, so build this from the phonemes where you can (or the closest word in the round).
-- Raise `SpeechUnavailable` while models load, so the API answers `503` instead of crashing.
-- Nothing else in the backend changes. The tests fake this function, so they keep passing.
+The Docker image doesn't include speech yet: the droplet image (ROCm PyTorch + GPU access) comes on Day 3.
+
+**Known issue: accents.** Targets use British espeak, so a correct American "dog" (`d ɑ g`) currently scores as a vowel substitution. Consonants, including b/d, come through reliably. Tuning `scoring.normalize()` on the **real evaluation clips** fixes this (not on synthetic voices).
 
 ### Check that the sound symbols match (most important on Day 2)
 Targets are converted with espeak-ng, British English:

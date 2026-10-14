@@ -1,5 +1,7 @@
 import os
+import threading
 import time
+from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Path, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,7 +16,14 @@ from .schemas import (
 MOCK = os.getenv("MOCK_MODE") == "1"
 MAX_AUDIO_BYTES = 5_000_000  # ~5 min of webm/opus; a word is a few KB
 
-app = FastAPI(title="Phonics Arcade API")
+@asynccontextmanager
+async def lifespan(_app):
+    if not MOCK:
+        threading.Thread(target=speech.warm_up, daemon=True).start()  # load the model before the first player speaks
+    yield
+
+
+app = FastAPI(title="Phonics Arcade API", lifespan=lifespan)
 # Browser game runs on another origin (localhost dev server, Vercel) than the API.
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 bearer = HTTPBearer(auto_error=False)  # "Authorization: Bearer <token>"; also adds the Authorize button to /docs
@@ -75,6 +84,8 @@ def score(
             heard, heard_ph = speech.recognize(data, audio.content_type or "")
         except speech.SpeechUnavailable as e:
             raise HTTPException(503, str(e))
+        except speech.BadAudio as e:
+            raise HTTPException(422, str(e))
         heard_ph = scoring.normalize(heard_ph)
 
     result = {
@@ -85,6 +96,8 @@ def score(
         "response_ms": None if shown_at_ms is None else max(0, round(received_ms - shown_at_ms)),
         **scoring.score(target_ph, heard_ph, target, heard),
     }
+    if result["correct"] and not heard:  # the phoneme model gives sounds, not words
+        result["heard"] = target
     if player:
         db.save_attempt(player, game, target, result)
     return result
