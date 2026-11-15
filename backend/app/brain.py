@@ -105,7 +105,7 @@ def weakest(player_id: str, top: int = 2) -> list[str]:
 
 def pick_items(items: list[str], weak: list[str]) -> list[str]:
     """Words containing the player's weak sounds first, then the rest, shuffled."""
-    targeted = [w for w in items if set(weak) & set(g2p.phonemes(w))]
+    targeted = [w for w in items if set(weak) & set(g2p.phonemes(w.split("|")[-1]))]  # "prompt|answer": the answer is read
     rest = [w for w in items if w not in targeted]
     random.shuffle(targeted)
     random.shuffle(rest)

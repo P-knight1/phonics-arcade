@@ -1,5 +1,5 @@
-/* Placeholder look until the dyslexia-friendly UI guide arrives (Content, Day 1):
-   large sans-serif text, wide spacing, off-white background, no italics, left-aligned. */
+/* Dyslexia-friendly Arabic (docs/research.md section 6): right to left, large text, generous line and word
+   spacing, off-white background, no italics. No letter-spacing: it breaks the joins between Arabic letters. */
 :root {
   --bg: #faf6ec;
   --surface: #ffffff;
@@ -13,11 +13,14 @@
   --warn: #8a4b08;
   --warn-bg: #fdefd8;
 
-  font-family: Verdana, "Trebuchet MS", Arial, sans-serif;
+  /* UI text in a clear sans; practice text in a naskh face whose vowel marks stay legible at size. */
+  --ui-font: "Segoe UI", Tahoma, "Noto Sans Arabic", Arial, sans-serif;
+  --read-font: "Simplified Arabic", "Noto Naskh Arabic", "Traditional Arabic", "Times New Roman", serif;
+
+  font-family: var(--ui-font);
   font-size: 20px;
-  line-height: 1.6;
-  letter-spacing: 0.03em;
-  word-spacing: 0.1em;
+  line-height: 1.8;
+  word-spacing: 0.12em;
   color: var(--text);
   background: var(--bg);
 }
@@ -76,7 +79,6 @@ i {
 button,
 .button {
   font: inherit;
-  letter-spacing: inherit;
   display: inline-block;
   padding: 0.7rem 1.4rem;
   border-radius: 10px;
@@ -129,9 +131,9 @@ label {
   font-weight: bold;
 }
 
-input {
+input,
+select {
   font: inherit;
-  letter-spacing: inherit;
   display: block;
   width: 100%;
   margin-top: 0.3rem;
@@ -300,10 +302,43 @@ label .hint {
 }
 
 .word {
-  font-size: clamp(3rem, 14vw, 5.5rem);
+  font-family: var(--read-font);
+  font-size: clamp(3.2rem, 15vw, 6rem);
   font-weight: bold;
-  line-height: 1.2;
-  letter-spacing: 0.08em;
+  line-height: 1.9;
+}
+
+.prompt,
+.sentence,
+.story-text,
+.answer {
+  font-family: var(--read-font);
+  line-height: 2.2;
+  word-spacing: 0.3em;
+}
+
+.prompt {
+  font-size: clamp(1.8rem, 7vw, 2.6rem);
+  font-weight: bold;
+}
+
+.sentence {
+  font-size: clamp(1.6rem, 5.5vw, 2.3rem);
+}
+
+.story-text {
+  font-size: 1.6rem;
+  max-width: none;
+}
+
+.answer {
+  font-size: 1.6rem;
+  font-weight: bold;
+  color: var(--good);
+}
+
+.question .sentence {
+  margin-bottom: 0.6rem;
 }
 
 .hidden-word {
@@ -354,11 +389,83 @@ label .hint {
 .debug-title {
   font-size: 0.8rem;
   font-weight: bold;
-  text-transform: uppercase;
   color: var(--muted);
   margin-bottom: 0.6rem;
 }
 
 .debug-panel label {
   margin-bottom: 0;
+}
+
+/* Progress */
+h2 {
+  font-size: 1.25rem;
+  margin: 1.6rem 0 0.7rem;
+}
+
+label.inline {
+  max-width: 18rem;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.8rem;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  color: var(--muted);
+}
+
+.stat-value {
+  font-size: 1.8rem;
+  font-weight: bold;
+  color: var(--text);
+}
+
+.day {
+  margin-bottom: 1rem;
+}
+
+.day-title {
+  margin-bottom: 0.2rem;
+  color: var(--muted);
+}
+
+.bar-row {
+  display: grid;
+  grid-template-columns: 7.5rem 1fr 3.5rem;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.bar {
+  height: 0.9rem;
+  background: var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.bar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.bar.sound > span {
+  background: var(--good);
+}
+
+.bar.errors > span {
+  background: var(--warn);
+}
+
+.spaced {
+  margin-top: 2rem;
 }

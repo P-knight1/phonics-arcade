@@ -156,7 +156,7 @@ Sources: [Al-Jarida 2017 (Arabic)](https://www.aljarida.com/articles/14855936043
 
 1. **Competition rules:** nothing is public. Ask KDA for judging criteria, submission format, and whether a working demo is required.
 2. **Dialect list (4.1):** a native Kuwaiti speaker checks it before scoring tolerates dialect pronunciations.
-3. **Pilot paperwork:** write the information sheet and consent form from section 7; fix the deletion date.
+3. **Pilot paperwork:** drafted in [pilot-consent.md](pilot-consent.md) (deletion by 31 Dec 2026); fill in the researcher's name and contact.
 4. **Kuwait prevalence:** only a 2017 newspaper figure exists. Ask KDA whether the survey was published; otherwise quote Aldakhil 2024 only.
 5. **Word lists:** grow them by letter family (dot pairs), syllable shape and root, from section 1.
 6. **Unverified, read before quoting:** the 2025 digital-intervention meta-analysis (g≈0.42), the UAE ChatGPT study, Amal's "speech therapy" claim.

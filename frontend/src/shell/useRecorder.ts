@@ -24,14 +24,14 @@ export function useRecorder(): Recorder {
 
   const start = useCallback(async () => {
     if (!supported) {
-      setError("This browser can't record sound.");
+      setError("هذا المتصفح لا يسجّل الصوت.");
       return false;
     }
     if (recorder.current) return true;
     try {
       stream.current ??= await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch {
-      setError("The microphone is blocked. Allow it in your browser, then try again.");
+      setError("الميكروفون محجوب. اسمح به في المتصفح ثم حاول مرة أخرى.");
       return false;
     }
     setError(null);

@@ -1,19 +1,20 @@
 import { Link } from "react-router-dom";
-import { usePlayer } from "./session";
+import { displayName, useSession } from "./session";
 
 const ITEMS = [
-  { to: "/games/word-flash", title: "Word Flash", text: "Read the word before it hides." },
-  { to: "/games/sound-surgery", title: "Sound Surgery", text: "Take a sound out, or swap it." },
-  { to: "/games/story-recall", title: "Story Recall", text: "Read a story made for you." },
-  { to: "/progress", title: "Progress", text: "See how you are doing." },
+  { to: "/games/word-flash", title: "الكلمة الخاطفة", text: "اقرأ الكلمة قبل أن تختفي." },
+  { to: "/games/sound-surgery", title: "جراحة الأصوات", text: "احذف صوتًا من الكلمة أو بدّله." },
+  { to: "/games/story-recall", title: "قصتي", text: "اقرأ قصة كُتبت لك." },
+  { to: "/progress", title: "تقدّمي", text: "شاهد كيف تتحسّن." },
 ];
 
 export default function Menu() {
-  const player = usePlayer();
+  const session = useSession();
+  const name = session.status === "in" ? displayName(session.player, session.guest) : "";
   return (
     <>
-      <h1>Hi {player.name}</h1>
-      <p className="lead">Pick a game.</p>
+      <h1>أهلًا {name}</h1>
+      <p className="lead">اختر لعبة.</p>
       <nav className="menu">
         {ITEMS.map((item) => (
           <Link key={item.to} to={item.to} className="menu-item">

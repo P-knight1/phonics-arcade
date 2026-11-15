@@ -1,15 +1,29 @@
 import type { ErrorType } from "../api";
 
-// Placeholder wording until content/feedback.json arrives (Content, Day 1). Keep it kind, and never medical.
+// Shown after a wrong answer. Kind, specific, never clinical.
 export const FEEDBACK: Record<ErrorType, string> = {
-  none: "Spot on!",
-  letter_reversal: "Two letters that look alike got swapped, like b and d. They are tricky!",
-  missing_sound: "One sound went missing. Try to say every sound.",
-  added_sound: "An extra sound slipped in.",
-  substitution: "One sound came out different.",
-  no_response: "No answer that time. That is okay.",
-  dot_confusion: "Two letters that differ only by their dots got mixed up. Look closely at the dots!",
-  vowel_error: "One short vowel mark (haraka) was read differently.",
-  vowel_length: "A vowel was read too long or too short.",
-  letter_position: "Two letters swapped places.",
+  none: "أحسنت!",
+  letter_reversal: "تبادل حرفان متشابهان مكانيهما. هذا يحدث كثيرًا!",
+  missing_sound: "سقط صوت من الكلمة. حاول أن تنطق كل الأصوات.",
+  added_sound: "دخل صوت زائد على الكلمة.",
+  substitution: "خرج أحد الأصوات مختلفًا.",
+  no_response: "لم تُجب هذه المرة، ولا بأس.",
+  dot_confusion: "اختلط حرفان لا يفرّق بينهما إلا النقاط. انظر إلى النقاط جيدًا!",
+  vowel_error: "قُرئت إحدى الحركات بشكل مختلف. انتبه إلى الفتحة والضمة والكسرة.",
+  vowel_length: "مُدّ صوت قصير أو قُصِّر صوت طويل.",
+  letter_position: "تبادل حرفان مكانيهما في الكلمة.",
+};
+
+// Short names for the progress screen.
+export const ERROR_NAMES: Record<ErrorType, string> = {
+  none: "صحيح",
+  letter_reversal: "حرفان متبادلان",
+  missing_sound: "صوت ناقص",
+  added_sound: "صوت زائد",
+  substitution: "صوت مختلف",
+  no_response: "بلا إجابة",
+  dot_confusion: "النقاط",
+  vowel_error: "الحركات",
+  vowel_length: "المدّ",
+  letter_position: "ترتيب الحروف",
 };

@@ -89,6 +89,11 @@ export function useSession() {
   return session;
 }
 
+/** The name to show: the server calls every guest "Guest". */
+export function displayName(player: api.Player, guest: boolean): string {
+  return guest ? "ضيف" : player.name;
+}
+
 /** The logged-in player. Only call inside the game shell, which is rendered after login. */
 export function usePlayer(): api.Player {
   const session = useSession();

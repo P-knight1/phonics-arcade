@@ -98,7 +98,7 @@ async function errorDetail(res: Response): Promise<string> {
   } catch {
     // not JSON: fall through
   }
-  return `Request failed (${res.status})`;
+  return `تعذّر الطلب (${res.status})`;
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -111,7 +111,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   try {
     res = await fetch(`${BASE_URL}${path}`, { ...init, headers });
   } catch {
-    throw new ApiError(0, "Can't reach the server");
+    throw new ApiError(0, "تعذّر الوصول إلى الخادم");
   }
   if (!res.ok) {
     if (res.status === 401 && sentToken) onUnauthorized?.();

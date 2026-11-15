@@ -26,10 +26,10 @@ export default function MicButton({ recorder, onAudio, disabled }: Props) {
         disabled={disabled || !recorder.supported}
         aria-pressed={recorder.recording}
       >
-        {recorder.recording ? "Done" : "Speak"}
+        {recorder.recording ? "انتهيت" : "تكلّم"}
       </button>
       <p className="hint">
-        {recorder.recording ? "Listening. Tap Done when you have said it." : "Tap Speak, then say it out loud."}
+        {recorder.recording ? "نستمع إليك. اضغط «انتهيت» بعد أن تقولها." : "اضغط «تكلّم» ثم قلها بصوت عالٍ."}
       </p>
       {recorder.error && (
         <p className="error" role="alert">

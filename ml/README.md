@@ -102,7 +102,8 @@ by default: rename the new folder to that, or point `ARABIC_SPEECH_MODEL` at it.
 
 ## Adult pilot: agreement with a human listener
 
-Consenting adults only; follow the checklist in [docs/research.md](../docs/research.md) section 7 first.
+Consenting adults only; follow the checklist in [docs/research.md](../docs/research.md) section 7 first. The
+information sheet and consent form, in Arabic and English, are in [docs/pilot-consent.md](../docs/pilot-consent.md).
 
 1. **Items:** [pilot_items.csv](pilot_items.csv) has 24 cards: 8 read correctly and 16 with a deliberate error
    (5 dot letters, 3 short vowels, 3 vowel lengths, 3 swapped letters, 1 missing and 1 added sound).

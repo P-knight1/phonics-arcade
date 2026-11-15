@@ -28,9 +28,11 @@ so it can tell قَمَر from قُمَر and حَبْل from جَبْل. The re
 | Game | The reader... | Status |
 |---|---|---|
 | Word Flash | reads a vowelized word before it disappears; display time adapts | Playable |
-| Sound Surgery | says a word with one sound removed or swapped (phonemic awareness) | Backend ready, screen in progress |
-| Story Recall | reads a generated story sentence by sentence, then answers questions | Backend ready, screen in progress |
-| Progress | sees word accuracy, sound accuracy, speed and error types over time | Backend ready, screen in progress |
+| Sound Surgery | says a word with its first syllable or last sound removed, or its first letter swapped for its dot twin (phonemic awareness) | Playable |
+| Story Recall | reads a generated story sentence by sentence, then answers questions | Playable with an LLM endpoint |
+| Progress | sees word accuracy, sound accuracy, speed and error types over time | Done |
+
+The interface is Arabic and right to left, with large practice text in a naskh face and wide line spacing.
 
 Designed but not built: rhythmic reading, root-and-pattern games, fading vowel marks as letters are mastered,
 tolerance for Kuwaiti pronunciations. See [docs/design.md](docs/design.md) section 8 for known limits.
@@ -90,7 +92,7 @@ backend/tests/   pytest suite
 frontend/src/    React app: shell/ (login, menu, mic, debug input), games/<game>/
 content/         vowelized word lists per game, story prompt
 ml/              phoneme model: training, evaluation, adult-pilot scoring
-docs/            design.md (how it works), research.md (the evidence)
+docs/            design.md (how it works), research.md (the evidence), pilot-consent.md
 ```
 
 ## Data and ethics

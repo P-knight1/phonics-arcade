@@ -1,62 +1,23 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
-import * as api from "../../api";
-import { DEBUG } from "../../shell/debug";
-import DebugPanel from "../../shell/DebugPanel";
+import { useEffect, useRef, useState } from "react";
+import type * as api from "../../api";
+import AnswerControls from "../../shell/AnswerControls";
 import { FEEDBACK } from "../../shell/feedback";
-import MicButton from "../../shell/MicButton";
-import { usePlayer } from "../../shell/session";
-import { useRecorder } from "../../shell/useRecorder";
+import { RoundFailed, RoundSummary, useRound } from "../../shell/round";
+import { useScorer, type SpokenAnswer } from "../../shell/useScorer";
 
 const GAME = "word_flash";
+const TITLE = "الكلمة الخاطفة";
 
-type Phase =
-  | "loading" // asking the server for the next round
-  | "ready" // round intro: level and reason
-  | "showing" // the word is on screen
-  | "answering" // the word is hidden, waiting for the answer
-  | "scoring"
-  | "feedback"
-  | "summary" // round finished
-  | "failed"; // the round could not be loaded
+type Phase = "intro" | "showing" | "answering" | "feedback" | "summary";
 
 export default function WordFlash() {
-  const player = usePlayer();
-  const recorder = useRecorder();
-  const [phase, setPhase] = useState<Phase>("loading");
-  const [exercise, setExercise] = useState<api.Exercise | null>(null);
+  const round = useRound(GAME);
+  const scorer = useScorer(GAME);
+  const [phase, setPhase] = useState<Phase>("intro");
   const [index, setIndex] = useState(0);
   const [results, setResults] = useState<api.ScoreResult[]>([]);
-  const [notice, setNotice] = useState<string | null>(null);
-  // Voice scoring answered 503 (model not connected): fall back to the debug buttons.
-  const [voiceDown, setVoiceDown] = useState(false);
   const shownAt = useRef(0);
-
-  const loadRound = useCallback(
-    async (history: api.ScoreResult[]) => {
-      setPhase("loading");
-      setNotice(null);
-      try {
-        setExercise(await api.nextExercise(player.player_id, GAME, history));
-        setIndex(0);
-        setResults([]);
-        setPhase("ready");
-      } catch (e) {
-        if (e instanceof api.ApiError && e.status === 401) return; // the shell shows the login screen
-        setNotice(
-          e instanceof api.ApiError && e.status === 404
-            ? "There are no words for this game yet."
-            : "The round could not be loaded.",
-        );
-        setPhase("failed");
-      }
-    },
-    [player.player_id],
-  );
-
-  useEffect(() => {
-    void loadRound([]);
-  }, [loadRound]);
+  const exercise = round.exercise;
 
   // The word hides after display_ms. The player can still answer once it is gone.
   useEffect(() => {
@@ -65,24 +26,16 @@ export default function WordFlash() {
     return () => clearTimeout(timer);
   }, [phase, exercise, index]);
 
-  if (phase === "loading") return <p className="center-note">Loading…</p>;
-  if (phase === "failed" || !exercise) {
-    return (
-      <>
-        <h1>Word Flash</h1>
-        <p className="error" role="alert">
-          {notice}
-        </p>
-        <div className="row">
-          <button className="primary" onClick={() => void loadRound([])}>
-            Try again
-          </button>
-          <Link to="/" className="button secondary">
-            Back to games
-          </Link>
-        </div>
-      </>
-    );
+  function newRound(history: api.ScoreResult[]) {
+    setIndex(0);
+    setResults([]);
+    setPhase("intro");
+    void round.load(history);
+  }
+
+  if (round.state === "loading") return <p className="center-note">جارٍ التحميل…</p>;
+  if (round.state === "failed" || !exercise) {
+    return <RoundFailed title={TITLE} error={round.error} retry={() => newRound([])} />;
   }
 
   const word = exercise.items[index];
@@ -90,71 +43,42 @@ export default function WordFlash() {
 
   function showWord(at: number) {
     setIndex(at);
-    setNotice(null);
     shownAt.current = Date.now();
     setPhase("showing");
   }
 
-  async function submit(answer: { audio?: Blob; heardText?: string }) {
-    recorder.cancel();
-    setPhase("scoring");
-    setNotice(null);
-    try {
-      const result = await api.score({ target: word, game: GAME, shownAtMs: shownAt.current, ...answer });
+  async function submit(answer: SpokenAnswer) {
+    const result = await scorer.check(word, answer, shownAt.current);
+    if (result) {
       setResults((done) => [...done, result]);
       setPhase("feedback");
-    } catch (e) {
-      if (e instanceof api.ApiError && e.status === 401) return;
-      if (e instanceof api.ApiError && e.status === 503) {
-        setVoiceDown(true);
-        setNotice("Voice scoring is not connected yet. Use the buttons below.");
-      } else {
-        setNotice("That answer could not be checked. Try again.");
-      }
+    } else {
       setPhase("answering");
     }
   }
 
-  if (phase === "ready") {
+  if (phase === "intro") {
     return (
       <>
-        <h1>Word Flash</h1>
-        <p className="level">Level {exercise.level}</p>
+        <h1>{TITLE}</h1>
+        <p className="level">المستوى {exercise.level}</p>
         <p className="lead">{exercise.reason}</p>
         <p>
-          {exercise.items.length} words. Each word shows for {(exercise.display_ms / 1000).toFixed(1)} seconds, then
-          hides. Say it out loud.
+          {exercise.items.length} كلمات. تظهر كل كلمة {(exercise.display_ms / 1000).toFixed(1)} ثانية ثم تختفي. اقرأها
+          بصوت عالٍ.
         </p>
         <button className="primary" onClick={() => showWord(0)} autoFocus>
-          Start
+          ابدأ
         </button>
       </>
     );
   }
 
-  if (phase === "summary") {
-    const right = results.filter((r) => r.correct).length;
-    return (
-      <>
-        <h1>Round done</h1>
-        <p className="level">
-          {right} of {results.length} right
-        </p>
-        <div className="row">
-          <button className="primary" onClick={() => void loadRound(results)} autoFocus>
-            Next round
-          </button>
-          <Link to="/" className="button secondary">
-            Back to games
-          </Link>
-        </div>
-      </>
-    );
-  }
+  if (phase === "summary") return <RoundSummary results={results} next={() => newRound(results)} />;
 
   const count = (
     <p className="count">
-      Word {index + 1} of {exercise.items.length}
+      الكلمة {index + 1} من {exercise.items.length}
     </p>
   );
 
@@ -165,42 +89,24 @@ export default function WordFlash() {
         {count}
         <div className={last.correct ? "stage correct" : "stage wrong"}>
           <p className="word">{word}</p>
-          <p className="verdict">{last.correct ? "✓ You got it!" : `The word was ${word}.`}</p>
-          {!last.correct && last.heard && <p>You said {last.heard}.</p>}
+          <p className="verdict">{last.correct ? "✓ أحسنت!" : "هذه هي الكلمة."}</p>
+          {!last.correct && last.heard && <p>سمعنا: {last.heard}</p>}
           {!last.correct && <p>{FEEDBACK[last.error_type]}</p>}
         </div>
         <button className="primary" onClick={() => (isLast ? setPhase("summary") : showWord(index + 1))} autoFocus>
-          {isLast ? "Finish round" : "Next word"}
+          {isLast ? "أنهِ الجولة" : "الكلمة التالية"}
         </button>
       </>
     );
   }
 
-  const busy = phase === "scoring";
   return (
     <>
       {count}
       <div className="stage">
-        {phase === "showing" ? <p className="word">{word}</p> : <p className="hidden-word">What was the word?</p>}
+        {phase === "showing" ? <p className="word">{word}</p> : <p className="hidden-word">ما الكلمة؟</p>}
       </div>
-      {notice && (
-        <p className="error" role="alert">
-          {notice}
-        </p>
-      )}
-      {busy ? (
-        <p className="center-note">Checking…</p>
-      ) : (
-        <>
-          {!voiceDown && <MicButton recorder={recorder} onAudio={(audio) => void submit({ audio })} />}
-          <button className="quiet" onClick={() => void submit({})}>
-            I missed it
-          </button>
-          {(DEBUG || voiceDown || !recorder.supported) && (
-            <DebugPanel target={word} onAnswer={(heardText) => void submit({ heardText })} />
-          )}
-        </>
-      )}
+      <AnswerControls scorer={scorer} target={word} onAnswer={(answer) => void submit(answer)} />
     </>
   );
 }

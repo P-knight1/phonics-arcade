@@ -142,13 +142,18 @@ symbols in `SYMBOLS`; `ml/train.py` guarantees that.
 - `MOCK_MODE=0` is the real pipeline. Without the speech packages audio returns `503`, but typed answers
   (`heard_text`) still go through scoring, progress and levels.
 - Every game has a debug mode (`?debug=1`): "said it right", "said it wrong" and a box for what was heard.
+- Frontend: one page per game under `frontend/src/games/`. Shared pieces in `frontend/src/shell/`: `useRound`
+  loads a round from `/next-exercise`, `useScorer` and `AnswerControls` handle the mic, the skip button, typed
+  answers, and the switch to typed answers when `/score` returns `503`.
 - Word lists: `content/<game>.json`, levels easiest first, at least 5 items each, read on every request:
 
 ```json
 { "levels": [ { "focus": "كَلِمَاتٌ قَصِيرَةٌ", "display_ms": 2000, "items": ["وَلَدْ", "قَمَرْ", "سَمَكْ", "مَلِكْ", "عَلَمْ"] } ] }
 ```
 
-- Sound Surgery items store prompt and answer as `"prompt|answer"`; `/score` gets the answer as `target`.
+- Sound Surgery items store prompt and answer as `"prompt|answer"`; `/score` gets the answer as `target`, and the
+  weak-sound targeting looks at the answer only. `backend/tests/test_content.py` checks every content file.
+- Game names stored with attempts: `word_flash`, `sound_surgery`, `story_recall`.
 
 ## 8. Known limits
 
