@@ -24,7 +24,7 @@ async def lifespan(_app):
 
 
 app = FastAPI(title="Phonics Arcade API", lifespan=lifespan)
-# Browser game runs on another origin (localhost dev server, Vercel) than the API.
+# Browser game runs on another origin (localhost dev server, hosted frontend) than the API.
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 bearer = HTTPBearer(auto_error=False)  # "Authorization: Bearer <token>"; also adds the Authorize button to /docs
 
@@ -86,7 +86,7 @@ def score(
             raise HTTPException(503, str(e))
         except speech.BadAudio as e:
             raise HTTPException(422, str(e))
-        heard_ph = scoring.normalize(heard_ph)
+        heard_ph = scoring.normalize(heard_ph, keep_length=scoring.is_arabic(target))
 
     result = {
         "heard": heard,

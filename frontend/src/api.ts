@@ -7,7 +7,11 @@ export type ErrorType =
   | "missing_sound"
   | "added_sound"
   | "substitution"
-  | "no_response";
+  | "no_response"
+  | "dot_confusion"
+  | "vowel_error"
+  | "vowel_length"
+  | "letter_position";
 
 export interface ScoreResult {
   heard: string;

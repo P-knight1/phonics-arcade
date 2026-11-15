@@ -1,4 +1,4 @@
-"""Audio -> what the player actually said, with a phoneme model (AMD GPU on the droplet, CPU while developing).
+"""Audio -> what the player actually said, with a phoneme model (GPU when available, otherwise CPU).
 
 Interface main.py relies on (keep it):
 
@@ -53,7 +53,7 @@ def _load():
         from transformers import AutoModelForCTC, AutoProcessor
     except ImportError as e:
         raise SpeechUnavailable("speech packages not installed: see backend/requirements-speech.txt") from e
-    device = "cuda" if torch.cuda.is_available() else "cpu"  # PyTorch's ROCm build reports AMD GPUs as "cuda"
+    device = "cuda" if torch.cuda.is_available() else "cpu"  # NVIDIA, and AMD via PyTorch's ROCm build, both report as "cuda"
     processor = AutoProcessor.from_pretrained(MODEL)
     model = AutoModelForCTC.from_pretrained(MODEL).to(device).eval()
     return torch, processor, model, device

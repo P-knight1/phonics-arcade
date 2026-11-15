@@ -7,4 +7,4 @@ services:
     volumes:
       - ./content:/content:ro   # word lists and prompts: edit without rebuilding
       - ./data:/app/data        # SQLite progress database survives restarts
-  # frontend: add once frontend/ has a Dockerfile (Frontend A picks the framework)
+  # frontend: add once frontend/ has a Dockerfile

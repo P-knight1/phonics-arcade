@@ -8,3 +8,4 @@ dist/
 *.wav
 *.webm
 !content/**/*.wav
+ml/models/

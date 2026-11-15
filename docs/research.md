@@ -1,0 +1,166 @@
+# Research: Arabic dyslexia, competitors, evidence and technology
+
+Collected 14–15 Nov 2026 for the Kuwait Dyslexia Association (KDA) AI competition (deadline 30 Nov). Every claim has a source at the end of its section; primary sources (journal, PubMed/PMC, registry, official repo) were checked on 15 Nov unless marked otherwise. **"Unverified" marks a claim we could only see in a secondary source or abstract: don't quote it in the pitch until someone reads the original.**
+
+**Positioning in one line:** the first Arabic reading tool that listens to a child read aloud, recognises *Arabic-specific* dyslexic error patterns (short vowels, dot-letters, letter position), and adapts practice to them, using methods with published evidence. Target users: children. **Pilot: adults only** (usability and scoring accuracy, not efficacy). No medical claims: practice and support, never diagnosis.
+
+---
+
+## 1. Dyslexia in Arabic: what is different
+
+| Feature | Why it matters for dyslexic readers | What we do with it |
+|---|---|---|
+| **Short vowels are diacritics (harakat)** and usually omitted in adult text | "Vowel dyslexia" is a described subtype: a selective problem with vowel processing. Vowelization plays a pivotal role for dyslexic readers | Score vowels separately; adapt how many harakat are shown |
+| **Letters that differ only by dots**: ب ت ث، ج ح خ، د ذ، ر ز، س ش، ص ض، ط ظ، ع غ، ف ق | Arabic's b/d. In typically developing children (grades 1, 2, 4), visual-orthographic errors were over a quarter of all spelling errors (Yassin, Share & Shalhoub-Awwad 2020). That category also covers letter-shape and joining errors, not only dots, and it is not a dyslexia sample. Example: حبل (rope) read as جبل (mountain) | A dedicated error type, `dot_confusion`, and practice built on these pairs |
+| **Letter-position errors**: letters migrate within a word | A described Arabic subtype. Migrations that keep the letter's shape are far more common than ones that change it | Detect order swaps as `letter_position` |
+| **Letter shape changes with position** (initial, middle, final, isolated) | Extra visual load | UI: generous spacing, larger marks (section 6) |
+| **Diglossia**: children speak a dialect but read Modern Standard Arabic | Strong impact on reading in dyslexic children. A Kuwait study of primary pupils found MSA and shared words easier to read than dialect-only words, and phonological awareness was the only unique predictor of reading | Start with words shared between Kuwaiti dialect and MSA; accept regular dialect pronunciations in scoring (section 4.1) |
+| **Morphology**: words are built from roots + patterns (ك ت ب → كَتَبَ، كاتِب، مَكتَب) | Morphological awareness is the **strongest predictor of reading comprehension** in Arabic children; phonological awareness also matters | A root-and-pattern game is a real, Arabic-only innovation |
+| **Vowel length is meaningful** (كَتَبَ vs كاتَب) | Long vs short vowels change the word | Done: Arabic keeps the length mark `ː` in `scoring.normalize()` (English still drops it, for accents) |
+
+**Theory to cite:** Saiegh-Haddad's MAWRID model of Arabic word reading names three shaping features: vowelization, morphology and diglossia. Friedmann & Haddad-Hanna describe the Arabic dyslexia subtypes (vowel dyslexia, letter position dyslexia).
+
+**Prevalence (verified on PubMed):** Aldakhil 2024, *Research in Developmental Disabilities* 151:104812, a systematic review and meta-analysis of 18 studies (30,243 children aged 6–13; 8 from Egypt, 4 from Saudi Arabia). Pooled prevalence **11%**; higher in boys, in Asian Arab countries (24% vs 12% in Africa) and in **Gulf countries (24% vs 13% non-Gulf)**. The abstract gives **no Kuwait-specific figure**, and the Gulf estimate rests on few studies, so say "about 1 in 4 in Gulf studies" with that caveat.
+
+**Kuwait figures (newspaper only):** KDA told KUNA (reported by Al-Jarida, Jan 2017) that its survey of 30,000+ pupils in 650 state schools found 3.6% overall, with figures of about 12% (boys) and 10% (girls) that don't add up to the overall rate. **Unverified:** no published report found. Don't quote a Kuwait number in the pitch; use Aldakhil. The 2019 KISR paper also calls dyslexia one of the most common learning disabilities in Kuwaiti schools.
+
+**Kuwait context:** a Kuwait thesis found teachers lacked knowledge of dyslexia and of early intervention. KDA and the Kuwait Institute for Scientific Research (KISR) built *Sinbad and Jasmin* (سندباد وياسمينة), an adaptive Arabic app that trains **short-term memory** (al-Ghurayr & al-Naqi, *Journal of Engineering Research* 7(1), 2019). It was tested on a selected group of KDA students, with only a preliminary analysis and a long-term study "planned". **No outcome data are published.** It does not listen to reading.
+
+Sources: [Friedmann & Haddad-Hanna, Types of developmental dyslexia in Arabic](https://www.researchgate.net/profile/Naama-Friedmann/publication/289507044_Types_of_Developmental_Dyslexia_in_Arabic/links/578f4d7b08ae81b44671c314/Types-of-Developmental-Dyslexia-in-Arabic.pdf) · [MAWRID model](https://cris.iucc.ac.il/en/publications/mawrid-a-model-of-arabic-word-reading-in-development/) · [Schiff & Saiegh-Haddad 2017, diglossia and vowelization](https://link.springer.com/10.1007/s11145-016-9713-1) · [Manifestations of dyslexia in Arabic-speaking pupils (letter similarity)](https://aleph.edinum.org/8334?lang=en) · [Typology of visual dyslexia errors in Arabic](https://crstdla.dz/ojs/index.php/allj/article/view/152) · [Yassin et al. 2020, Learning to spell in Arabic (PMC)](https://pmc.ncbi.nlm.nih.gov/articles/PMC7497809) · [Metalinguistic skills review, Frontiers 2022](https://www.frontiersin.org/journals/communication/articles/10.3389/fcomm.2022.984340/pdf) · [Aldakhil 2024 meta-analysis (PubMed 39079361)](https://pubmed.ncbi.nlm.nih.gov/39079361/) · [KDA survey, Al-Jarida 2017 (Arabic)](https://www.aljarida.com/articles/1485593604316030300) · [Ali 2014, reading and diglossia in Kuwaiti primary schools (Leeds thesis)](https://etheses.whiterose.ac.uk/7457/) · [Kuwait thesis: teachers' knowledge](https://etheses.whiterose.ac.uk/id/eprint/17437/) · [Sinbad and Jasmin, al-Ghurayr & al-Naqi 2019 (abstract)](https://search.emarefa.net/en/detail/BIM-1494929-adaptive-arabic-application-for-enhancing-short-term-memory-) · [Same, journal page](https://journals.ku.edu.kw/jer/index.php/JER/article/view/7894) · [Phonological awareness in Kuwaiti dyslexic children](https://openaccess.library.uitm.edu.my/Record/doaj-85d99b1f39b34777b5a37b54df81bcc4)
+
+---
+
+## 2. Evidence for each part of the product
+
+| Part | Evidence | Strength | How to say it |
+|---|---|---|---|
+| **Phonological awareness training** (Sound Surgery) | Arabic studies, all Layes and colleagues (Algeria) unless noted: **2015** (*Bellaterra J.*): 10 dyslexic children vs 10 typical readers, no untrained dyslexic control. **2019** (*Reading & Writing Quarterly*): 20 trained vs 20 age- and reading-matched controls. **2020** (*Int. J. Disability, Development & Education*), combined PA + print, Grade 4: 22 vs 22, gains held at follow-up. **Al Farsi & Emam 2017** (*J. Educational & Psychological Studies*, Sultan Qaboos Univ., Oman): 14 children with reading disabilities **randomly assigned** (7 vs 7), 10 weeks; gains on PA and decoding, not on passage fluency. All found gains in phonological skills and word/pseudoword reading | Consistent direction, **very small samples, mostly non-randomised**; strong international evidence behind it | "Phonological training improved reading in Arabic-speaking children in several small studies" |
+| **Morphological training** (new: roots game) | Third grade, Algeria (JISNE 2021, El-Oued group): 12 trained vs 13 controls; gains in morphological awareness, word and pseudoword reading, and transfer to phonological awareness. The Arabic version of the paper reports 23 pupils with 10 trained, so the n is slightly inconsistent | Small but Arabic-specific | "Built on the morphological structure of Arabic, the strongest predictor of comprehension" |
+| **Teaching short vowels / fading harakat** | Asadi 2017 (1,516 children, grades 1–6): unvowelized words were read **more** accurately and fluently from grade 3 on; in grades 1–2 accuracy was similar. Al-Balushi et al. 2020 (Oman, 200 fourth graders, **descriptive**, not an intervention): diacritics made no difference to rapid naming of letters and single words in poor readers; the authors *recommend* teaching short vowels. Abu-Rabia's studies found vowels help accuracy and comprehension; others failed to replicate. Partial diacritization (only the marks needed to disambiguate) read more easily than full marking in one behavioural experiment with general readers (ElNokrashy & AlKhamissi 2024), **not dyslexic readers** | Mixed: supports **adaptive** vowel marks, not "always fully vowelized". No Arabic RCT of a vowel-fading intervention found | "Vowel marks are given where the reader needs them and faded as they master them" (an innovation; Read Along doesn't do this) |
+| **Rhythm and music** | **Flaugnacco et al. 2015** (*PLoS One*, NCT02316873): multicentre open-label **RCT**, 46 Italian children (24 music, 22 painting control), 30 weeks; music group better on rhythm, phonological awareness and reading. **Bonacina et al. 2015** (*Front. Psychol.*): Rhythmic Reading Training (RRT), 28 children aged 11–14 (14 vs 14 untrained controls, matched then randomly assigned), 9 sessions; RRT improved pseudoword speed and text accuracy. **Cancer et al. 2020** (*Front. Psychol.*, NCT02791841): 24 children, RRT vs another active program, pseudo-randomised, both improved, RRT tentatively better on long-pseudoword speed. **Descamps et al. 2025** (*Sci. Rep.*, NCT05154721): double-blind placebo-controlled RCT of Mila-Learn, 151 children aged 7–11 analysed (75 vs 76). **Primary outcome (nonword decoding) null**; in the per-protocol group (n=93) word-reading accuracy and speed improved (d≈0.42 and 0.44), which the authors call exploratory. Theory: Goswami's temporal sampling | Moderate, **never tested in Arabic**. Italian is a transparent orthography, like vowelized Arabic | "Adapted from rhythm-based reading training tested in Italian and French trials; our pilot is the first Arabic feasibility test." Don't say Mila-Learn "proved" reading gains |
+| **Reading aloud with feedback** (Word Flash) | Speech-recognition reading tutors (Project LISTEN). For Read Along, Google reports fluency gains (35–85% for slow starters after 100 minutes) from its own data and an Indian evaluation by Sattva, which compared users with a non-random comparison group. **No RCT and no Arabic evaluation found** | Moderate internationally | "Immediate, sound-level feedback on reading aloud" |
+| **Fluency practice with brief display** (Word Flash) | Automaticity/fluency training (international). A 2025 meta-analysis of digital interventions for poor readers (41 studies, 2000–2022, mostly alphabetic languages) reports g≈0.42 (**unverified**, abstract only) | Moderate | — |
+
+**Newer Arabic studies (2018–2026), searched 15 Nov:** no Arabic reading-intervention meta-analysis and no large or app-based Arabic RCT found. Only small studies, none above the bar for the pitch: a UAE quasi-experiment using ChatGPT for comprehension (n=60, journal not confirmed), a Saudi text-to-speech PhD study (11 girls), and a Saudi game-app PhD thesis. A 2025 systematic review covers Arabic *screening* tools, not interventions. **This gap is a pitch point:** Arabic dyslexia practice tools are under-tested, and our pilot logs the data needed for a proper trial.
+
+Sources: [Layes et al. 2015 (Bellaterra, PDF)](https://ddd.uab.cat/pub/jtl3/jtl3_a2015m11-12v8n4/jtl3_a2015v8n4p24.pdf) · [Layes et al. 2019 (HAL)](https://hal.univ-lorraine.fr/hal-03220047) · [Layes et al. 2020, combined PA + print (publisher)](https://www.tandfonline.com/doi/abs/10.1080/1034912X.2020.1779914) · [Same (HAL)](https://hal.univ-lorraine.fr/hal-03220053) · [Morphological training, Grade 3 (JISNE 2021)](https://jisne.kglmeridian.com/view/journals/spne/24/2/article-p66.xml) · [Same, Arabic version (El-Oued repository)](https://dspace.univ-eloued.dz/handle/123456789/16557) · [Al Farsi & Emam 2017 (DOAJ)](https://doaj.org/article/7855661cc8404deab0d47492e9fee2be) · [Asadi 2017, vowelised but not necessarily easy](https://cris.haifa.ac.il/en/publications/reading-arabic-with-the-diacritics-for-short-vowels-vowelised-but/) · [Al-Balushi et al. 2020, diacritics and rapid naming](https://journals.qu.edu.qa/index.php/jes/article/view/1747) · [Partial diacritization (ElNokrashy & AlKhamissi 2024)](https://arxiv.org/abs/2401.08919) · [Flaugnacco et al. 2015 (PMC)](https://pmc.ncbi.nlm.nih.gov/articles/PMC4583182) · [Bonacina et al. 2015 RRT (PMC)](https://pmc.ncbi.nlm.nih.gov/articles/PMC4593943) · [Cancer et al. 2020 RRT](https://www.frontiersin.org/articles/10.3389/fpsyg.2020.01158) · [Descamps et al. 2025, Mila-Learn RCT (PMC)](https://pmc.ncbi.nlm.nih.gov/articles/PMC12095514) · [Read Along Arabic launch, Google MENA blog](https://blog.google/intl/en-mena/product-updates/android-chrome-and-play/read-along-google/) · [Sattva Read Along evaluation](https://www.sattva.co.in/wp-content/uploads/2020/09/Sattva_Google_Read-Along-IA-Report.pdf) · [Digital interventions meta-analysis 2025](https://link.springer.com/article/10.1007/s41465-025-00336-2) · [Arabic screening tools review 2025](https://www.sciencedirect.com/science/article/pii/S2666374025001050)
+
+---
+
+## 3. Competitors
+
+| Product | What it does | Gap we fill |
+|---|---|---|
+| **Google Read Along (Arabic since Sept 2020)** | Free; listens to children read Arabic stories; speech processed on the device; reading buddy "Diya". Google's product marketing manager said it is "permissive and leaning more towards accepting a pronunciation" (Khaleej Times, 2020). **Still active in 2026:** since June 2026 it is free inside Google Classroom for all education users, with an Arabic library; the Android app's Play listing still resolves | General reading, not dyslexia-specific. Accept-leaning scoring hides exactly the errors dyslexic readers need feedback on (harakat, dot-letters). No error profile, no morphology, no rhythm, no adaptive vowel marks. No independent Arabic evaluation |
+| **Mila-Learn** (France) | Rhythm games for ages 7–14; one large RCT (primary outcome null, per-protocol word-reading gains); tapping, clapping, singing | French; never listens to reading |
+| **Sinbad and Jasmin** (KISR + KDA, Kuwait, 2019) | Adaptive short-term memory training app; no published outcomes | No reading, no speech |
+| **Amal** | Learn-to-read Arabic app with speech recognition and a "speech therapy" track (vendor claim, app store only) | General literacy, not dyslexia error patterns |
+| **Lamsa, AlifBee** | Broad early-learning platforms | No speech scoring, not dyslexia-focused |
+| Screening tools: SARD (Zayed University, UAE), ArabLexify (student project) | Screen for Arabic reading difficulties | Screening ≠ practice; we must not claim to screen or diagnose |
+
+No Gulf or Kuwaiti Arabic dyslexia app that scores reading aloud was found (searched in English and Arabic, 15 Nov).
+
+**Our angle in one sentence for judges:** *Read Along accepts; we notice.* Precise, kind feedback on the errors that define Arabic dyslexia, plus practice that adapts to them, built on Arabic reading research.
+
+Sources: [Read Along "permissive" quote (Khaleej Times, Sept 2020)](https://www.khaleejtimes.com/tech/free-google-app-aims-to-help-kids-improve-their-arabic-reading-skills?amp=1) · [Read Along Arabic launch (Google MENA blog)](https://blog.google/intl/en-mena/product-updates/android-chrome-and-play/read-along-google/) · [Read Along in Classroom, June 2026 (Google Workspace Updates)](https://workspaceupdates.googleblog.com/2026/06/read-along-in-google-classroom-is-now-available-to-all-education-users-to-support-foundational-literacy.html) · [Read Along on Google Play](https://play.google.com/store/apps/details?id=com.google.android.apps.seekh) · [Arabic apps overview](https://kalimah-center.com/arabic-learning-apps-for-kids/) · [Amal listing](https://apps.apple.com/sa/app/id1517863038?l=ar-eg) · [Mila-Learn RCT (PMC)](https://pmc.ncbi.nlm.nih.gov/articles/PMC12095514) · [Mila-Learn usability study](https://pmc.ncbi.nlm.nih.gov/articles/PMC10811594/) · [SARD screener (Gulf News)](https://gulfnews.com/amp/uae/zayed-university-launches-new-online-learning-diagnostic-tool-1.95078074)
+
+---
+
+## 4. Technology for Arabic
+
+| Need | Options found | Recommendation |
+|---|---|---|
+| **Target text → phonemes** | espeak-ng Arabic (already in our stack): tested, بَاب → `b aː b`, كَتَبَ → `k a t a b a`; needs vowelized text. Iqra'Eval's **MSA phonetiser** (GitHub `Iqra-Eval/MSA_phonetiser`): **no licence file**, so legally "all rights reserved" until they add one | Use espeak now. If we switch to an Iqra'Eval model, ask the authors for a licence before shipping their phonetiser |
+| **Audio → phonemes** | Current model `wav2vec2-lv-60-espeak-cv-ft`: multilingual, **Arabic coverage unknown** (model card silent). **Iqra'Eval publishes checkpoints** on Hugging Face (`IqraEval/Iqra_wav2vec2_base`, `_hubert_base`, `_mhubert_base`, `_wavlm_base`), all **Apache-2.0**; its datasets (`Iqra_train`, `QuranMB.v2`, …) are **CC BY-NC 4.0** (no commercial use). Their domain is Qur'anic recitation, not children's MSA reading. Shared-task winner AraS2P fine-tuned Wav2Vec2-BERT | **Step 1:** test the current model on real Arabic recordings (1 day). **Step 2, if weak:** an Iqra'Eval Apache-2.0 checkpoint. Any fine-tune on their CC BY-NC data must stay non-commercial |
+| **Vowel marks on generated text** (stories) | Mishkal, Rababa, pipeline-diacritizer, CATT (used by SILMA) | Our word lists are written vowelized by hand. Only LLM stories need a diacritizer, or an LLM asked for full tashkeel plus a check |
+| **Audio prompts** (Echo Chain, "hear the word") | **SILMA TTS** official: GitHub `SILMA-AI/silma-tts` (code **MIT**) and Hugging Face `silma-ai/silma-tts` (weights **Apache-2.0**, not gated); 150M parameters, Arabic + English, F5-TTS based. Other Hugging Face copies are unofficial mirrors. ArVoice dataset: diacritized MSA | Record the small fixed set (syllables, words) with a team voice; use SILMA TTS only for generated text, downloaded from the official repo |
+| **Speech data** | **Common Voice:** since Oct 2025 new releases come only from Mozilla Data Collective (account + terms of service); the clips stay **CC0**. Children's Arabic: **Arabic Little STT** (Levantine, 288 children aged 6–13, 355 utterances, CC BY 4.0); **Abjad-Kids** (46,397 clips of letters, numbers, colours, ages 3–12; dataset licence not stated in the paper); **ASMDD** (100 Egyptian children aged 2–8, 100 isolated words with mispronunciation labels; **no licence stated**) | None is a children's MSA read-aloud corpus with an open licence. For the adult pilot, use our own consented recordings; ask the authors before using ASMDD or Abjad-Kids |
+| **Accents and dialects** | Read Along is accent-permissive by design. Kuwaiti mappings: section 4.1 | Accept the regular dialect pronunciations in 4.1; still flag dot-letter and vowel errors |
+
+Sources: [Iqra'Eval models (Hugging Face API)](https://huggingface.co/api/models?author=IqraEval) · [Iqra'Eval datasets (Hugging Face API)](https://huggingface.co/api/datasets?author=IqraEval) · [Iqra-Eval GitHub repos](https://github.com/Iqra-Eval) · [Iqra'Eval shared task](https://iqraeval-sharedtask-arabicnlp2025.static.hf.space/index.html) · [Iqra'Eval paper (ArabicNLP 2025)](https://aclanthology.org/2025.arabicnlp-sharedtasks.61) · [AraS2P](https://arxiv.org/abs/2509.23504v1) · [wav2vec2-lv-60-espeak-cv-ft model card](https://huggingface.co/facebook/wav2vec2-lv-60-espeak-cv-ft) · [Mishkal](https://pypi.org/project/mishkal/0.1) · [Rababa](https://github.com/interscript/rababa) · [pipeline-diacritizer](https://github.com/hamza5/pipeline-diacritizer) · [SILMA TTS official code (GitHub)](https://github.com/SILMA-AI/silma-tts) · [SILMA TTS official weights (Hugging Face)](https://huggingface.co/silma-ai/silma-tts) · [ArVoice](https://arxiv.org/pdf/2505.20506v1) · [More data, fewer diacritics (QCRI)](https://arxiv.org/html/2603.01622) · [Common Voice moves to Mozilla Data Collective (Mozilla's HF README)](https://huggingface.co/spaces/mozilla-foundation/README/blob/main/README.md) · [Arabic Little STT](https://arxiv.org/abs/2510.23319) · [Abjad-Kids](https://arxiv.org/abs/2603.20255) · [ASMDD dataset](https://arxiv.org/pdf/2111.01136) · [Arabic speech correction tool for children](https://arxiv.org/pdf/2411.13592)
+
+### 4.1 Dialect tolerance (Kuwaiti Arabic reading MSA)
+
+Regular Kuwaiti realisations a scorer can accept as "dialect, not error". Main source: Al-Qenaie 2011, *Kuwaiti Arabic: A Socio-Phonological Perspective* (Durham PhD), sections 3.2 and 5.1. Speakers shift toward MSA in formal settings, so these appear *sometimes*, more in younger speakers.
+
+| MSA letter | MSA | Kuwaiti | When | Scoring rule |
+|---|---|---|---|---|
+| ق | `q` | `g` (most common); sometimes `dʒ` | Any position; `dʒ` mostly near front vowels (e.g. قِبلة → `dʒibla`) | Accept `g`. Accept `dʒ` for ق only, never for ج words |
+| ك | `k` | `tʃ` | Near front vowels; always in the feminine "your" ending ـكِ → `-itʃ` | Accept `tʃ` for ك |
+| ج | `dʒ` | `j` (y) | Unconditioned but socially marked; common in everyday words (e.g. جا → `jaː`, دجاج → `diyaːy`) | Accept `j` for ج |
+| ض | `dˤ` | `ðˤ` (merged with ظ) | Almost always | Accept `ðˤ` for ض. Note: this makes ض/ظ inseparable by ear, so don't score that pair as `dot_confusion` |
+| ث ، ذ | `θ` ، `ð` | **kept** as in MSA | — | No tolerance: `t`/`s` or `d`/`z` for these are errors in a Kuwaiti reader (unlike Levantine or Egyptian speakers) |
+| ـَيْ ، ـَوْ | `aj` ، `aw` | `eː` ، `oː` | Diphthongs | Accept the long monophthong |
+| ال | `al-` | `il-` | Definite article | Accept `il-` |
+
+**Caution:** no source tests these against children reading MSA aloud; a native Kuwaiti speaker should confirm the list before tuning. The rules cover Kuwaiti and broadly Gulf speech, not other dialects.
+
+Sources: [Al-Qenaie 2011, Durham thesis (record)](https://etheses.durham.ac.uk/id/eprint/935/) · [Same, full text PDF](https://etheses.durham.ac.uk/935/1/Shamlan_al-Qenaie.._Final_Draft_(PhD).pdf) · [Alqattan 2015, Kuwaiti Arabic phonological acquisition (Newcastle thesis)](https://theses.ncl.ac.uk/jspui/handle/10443/2787) · [Ayyad & Bernhardt 2009, Kuwaiti Arabic phonology in children](https://informahealthcare.com/doi/abs/10.3109/02699200903236493)
+
+---
+
+## 5. Arabic error types (proposed backend change)
+
+Today's English `error_type` values stay, and these are added for Arabic:
+
+| `error_type` | Example | How we detect it |
+|---|---|---|
+| `dot_confusion` | ب read as ت (`b`→`t`), ج↔ح↔خ | A substitution between letters of the same dot-family (minus the dialect pairs in 4.1, e.g. ض/ظ) |
+| `vowel_error` | فَتَحَ read with a wrong short vowel | A substitution among short vowels `a i u` |
+| `vowel_length` | كاتِب read as كَتِب | Long ↔ short vowel (`aː`↔`a`); needs `ː` kept |
+| `letter_position` | Two letters swapped in order | An adjacent transposition in the phoneme sequence |
+| existing | `missing_sound`, `added_sound`, `substitution`, `no_response`, `none` | Unchanged |
+
+**Contract note:** this extends the error list, so the frontend's feedback wording needs entries for the new types.
+
+---
+
+## 6. Design for Arabic dyslexic readers
+
+- **Spacing beats special fonts:** in the Arabolexia study (Benmarrakchi et al., *Int. J. Arabic-English Studies*, early view; 45 dyslexic children, mean age about 11), Arabolexia's advantage disappeared once a standard font (Simplified Arabic) got the same spacing. In Latin scripts, extra-large letter spacing doubled text-reading accuracy in Italian and French dyslexic children (Zorzi et al. 2012, *PNAS*). A Palestinian study argues spacing alone isn't enough and calls for distinctive letter design, so the question is open. **Do:** generous letter and word spacing, large size, high contrast, and a setting to adjust them.
+- **Dot and diacritic size:** no peer-reviewed study found. **Maqroo** (Omantel / Leo Burnett) enlarges dots and harakat by 200%: a designer claim, not a controlled study, but a cheap idea to offer as an option. Hejres & Tinker 2024 (*Societies*) list design considerations for an Arabic dyslexia-friendly typeface (a design analysis, not a reading test); the resulting Mubassat typeface is in a 2025 thesis.
+- Right-to-left layout throughout; short spoken instructions; never rely on colour alone.
+
+Sources: [Arabolexia study](https://ijaes2011.net/index.php/IJAES/article/view/827) · [Zorzi et al. 2012, letter spacing (PMC)](https://pmc.ncbi.nlm.nih.gov/articles/PMC3396504) · [Arabic digital font for dyslexia (Palestine Polytechnic)](https://scholar.ppu.edu/handle/123456789/9462) · [Maqroo font](https://Itsnicethat.com/articles/maqroo-leo-burnett-omantel-dubai-graphic-design-110424) · [Mubassat typeface thesis](https://pure.hud.ac.uk/en/studentTheses/mubassat/) · [Hejres & Tinker 2024, Societies](https://mdpi.com/2075-4698/14/4/45)
+
+---
+
+## 7. Ethics checklist for the adult pilot
+
+Pilot = adults only, testing usability and scoring accuracy (not efficacy). Practical steps:
+
+1. **Information sheet + consent form** in Arabic and English: purpose, what is recorded, how long it is kept, who sees it, the right to stop at any time without giving a reason. Taking part is a separate ethical consent from any legal basis for processing the data.
+2. **Adults only, no vulnerable groups:** no minors and no one recruited through a dependency (students of a team member, employees).
+3. **Collect the minimum:** a pseudonym ID, age band and dialect only; no names or civil IDs stored with recordings. Record only the reading tasks.
+4. **Recordings:** stored encrypted, outside git and outside the public repo, on a team-controlled drive; access limited to named team members.
+5. **Retention:** delete raw audio when the evaluation is done (set a date, e.g. 31 Dec 2026); keep only scores and anonymised error counts. Delete a person's data on request.
+6. **No third-party processing** of audio beyond our own server; say so in the information sheet.
+7. **Wording:** "practice tool", never "test" or "diagnosis"; give no individual feedback that sounds clinical.
+8. **Kuwait law:** Kuwait has **no general personal data protection law**. CITRA's Data Privacy Protection Regulation (Decision 26 of 2024) covers licensed telecom/ICT service providers, a definition that can include apps; it requires information in Arabic and English, consent before collection, and deletion when consent is withdrawn. Following the steps above meets it. A university ethics committee review is needed only if a university runs the pilot (check with KDA).
+
+Sources: [UK ICO, research provisions: principles and lawful bases](https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/the-research-provisions/principles-and-grounds-for-processing/) · [GDPR Article 5 principles (EUR-Lex)](https://eur-lex.europa.eu/eli/reg/2016/679/oj) · [Kuwait data protection overview (DLA Piper)](https://www.dlapiperdataprotection.com/index.html?c=KW&t=law) · [CITRA Resolution 42/2021 (superseded in 2024, for reference)](https://www.citra.gov.kw/sites/en/LegalReferences/Resolution-No-42-On-Data-Privacy-Protection-Regulation.pdf)
+
+---
+
+## 8. Kuwait Dyslexia Association (KDA)
+
+- **Official site / social media:** not found (searched English and Arabic, 15 Nov). `kda.org.kw` belongs to the Kuwait Dental Association, so don't link it.
+- **Founding:** founded 14 Dec 2005, registered as a public-benefit association in Feb 2006 (Al-Jarida, 2017); an old directory says 1999. Use 2005.
+- **Activity:** dyslexia-friendly schools project, assessment services, teacher training with Kuwait University; briefed the Minister of Social Affairs on its programmes in Oct 2026, with a conference coming up. Not the same as KALD (Kuwaiti Association for Learning Differences).
+- **Screening tools or statistics:** only the 2017 newspaper survey figures (section 1). No published screening tool found.
+- **The AI competition:** **nothing public found** (rules, criteria, format). Get them from the organisers directly.
+
+Sources: [Al-Jarida 2017 (Arabic)](https://www.aljarida.com/articles/1485593604316030300) · [Kuwait Times, Oct 2026](https://kuwaittimes.com/article/51916/kuwait/social-affairs-minister-backs-support-for-people-with-learning-difficulties/)
+
+---
+
+## 9. Still missing (decide or find out)
+
+1. **Competition rules:** nothing is public. Ask KDA for judging criteria, what "innovation" means to them, submission format, and whether a working demo is required.
+2. **Does our phoneme model hear Arabic?** One afternoon: record 20 vowelized words, compare with espeak. If weak, try an Iqra'Eval Apache-2.0 checkpoint.
+3. **Dialect list (4.1):** a native Kuwaiti speaker checks it before we tune `scoring.normalize()`.
+4. **Pilot paperwork:** write the information sheet and consent form from section 7; fix the deletion date.
+5. **Kuwait prevalence:** only a 2017 newspaper figure exists. Ask KDA whether the survey was published; otherwise quote Aldakhil 2024 only.
+6. **Iqra'Eval phonetiser licence:** ask the authors, or keep espeak.
+7. **Word lists:** vowelized, organised by letter families (dot pairs), syllable shapes and roots. The content owner builds these from section 1.
+8. **Unverified, read before quoting:** the 2025 digital-intervention meta-analysis (g≈0.42), the UAE ChatGPT study, Amal's "speech therapy" claim.

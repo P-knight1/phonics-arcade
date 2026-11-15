@@ -1,7 +1,7 @@
 """The adaptive brain.
 
 Next exercise: plain rules over the content word lists (testable, never invents words outside the phonics
-progression). Stories: an LLM served by vLLM on the AMD droplet, through the OpenAI-compatible API.
+progression). Stories: an LLM behind any OpenAI-compatible API (vLLM, a hosted service, ...).
 """
 import json
 import os
@@ -19,6 +19,11 @@ from .scoring import missed_phonemes
 
 CONTENT_DIR = Path(__file__).resolve().parents[2] / "content"  # repo root locally, /content in Docker
 ROUND_SIZE = 5
+# espeak 'ar' phonemes -> what the player sees, so a reason never shows IPA. Unknown sounds show as they are.
+LETTER_FOR = {"b": "ب", "t": "ت", "θ": "ث", "dʒ": "ج", "ħ": "ح", "χ": "خ", "d": "د", "ð": "ذ", "r": "ر",
+              "z": "ز", "s": "س", "ʃ": "ش", "s̪": "ص", "dˤ": "ض", "t̪": "ط", "ʕ": "ع", "ɣ": "غ", "f": "ف",
+              "q": "ق", "k": "ك", "l": "ل", "m": "م", "n": "ن", "h": "ه", "w": "و", "j": "ي", "ʔ": "ء",
+              "a": "الفتحة", "i": "الكسرة", "u": "الضمة", "aː": "ا", "iː": "ي", "uː": "و"}
 MIN_RESULTS_TO_MOVE = 3  # don't change level on one lucky or unlucky word
 LEVEL_UP, LEVEL_DOWN = 0.8, 0.5  # word accuracy of the round just played
 
@@ -62,6 +67,34 @@ def weak_sounds(results: list[dict], top: int = 2) -> list[str]:
     return [p for p, _ in counts.most_common(top)]
 
 
+# Bayesian Knowledge Tracing (Corbett & Anderson 1995): the chance each sound is mastered, updated per attempt.
+P_INIT, P_LEARN, P_SLIP, P_GUESS = 0.3, 0.1, 0.1, 0.2
+WEAK = 0.6  # below this a sound still needs practice
+
+
+def bkt(p: float, correct: bool) -> float:
+    if correct:
+        p = p * (1 - P_SLIP) / (p * (1 - P_SLIP) + (1 - p) * P_GUESS)
+    else:
+        p = p * P_SLIP / (p * P_SLIP + (1 - p) * (1 - P_GUESS))
+    return p + (1 - p) * P_LEARN
+
+
+def mastery(attempts: list[dict]) -> dict[str, float]:
+    """attempts oldest first -> {sound: P(mastered)} for every sound the player has been asked to read."""
+    known: dict[str, float] = {}
+    for a in attempts:
+        missed = set(missed_phonemes(a["target_phonemes"], a["heard_phonemes"]))
+        for sound in set(a["target_phonemes"]):
+            known[sound] = bkt(known.get(sound, P_INIT), sound not in missed)
+    return known
+
+
+def weakest(player_id: str, top: int = 2) -> list[str]:
+    known = mastery(db.recent_attempts(player_id, limit=300)[::-1])
+    return sorted((s for s, p in known.items() if p < WEAK), key=known.get)[:top]
+
+
 def pick_items(items: list[str], weak: list[str]) -> list[str]:
     """Words containing the player's weak sounds first, then the rest, shuffled."""
     targeted = [w for w in items if set(weak) & set(g2p.phonemes(w))]
@@ -80,15 +113,15 @@ def next_exercise(player_id: str, game: str, history: list[dict]) -> dict:
         accuracy = sum(h["correct"] for h in history) / len(history)
         if accuracy >= LEVEL_UP and level < len(levels):
             level += 1
-            reason = f"level up: {levels[level - 1]['focus']}"
+            reason = f"مستوى أعلى: {levels[level - 1]['focus']}"
         elif accuracy < LEVEL_DOWN and level > 1:
             level -= 1
-            reason = f"slowing down: {levels[level - 1]['focus']}"
+            reason = f"نُبطئ قليلًا: {levels[level - 1]['focus']}"
     db.set_level(player_id, game, level)
     spec = levels[level - 1]
-    weak = weak_sounds(history) or weak_sounds(db.recent_attempts(player_id))  # first round: earlier sessions
+    weak = weakest(player_id) or weak_sounds(history)  # history only counts here when its attempts weren't saved
     if weak:
-        reason = f"practising {'/'.join(weak)}"
+        reason = "نتدرّب على: " + " / ".join(LETTER_FOR.get(p, p) for p in weak)
     return {"game": game, "level": level, "items": pick_items(spec["items"], weak),
             "display_ms": spec["display_ms"], "reason": reason}
 
@@ -113,11 +146,11 @@ def _complete(prompt: str) -> str:
 
 def story(player_id: str, weak: list[str], interests: list[str]) -> dict:
     if not weak:  # frontend doesn't know the weak sounds; the recorded attempts do
-        weak = weak_sounds(db.recent_attempts(player_id))
+        weak = weakest(player_id)
     if not interests and (player := db.get_player(player_id)):
         interests = player["interests"]
     template = Template((CONTENT_DIR / "prompts" / "story.txt").read_text(encoding="utf-8"))
-    prompt = template.safe_substitute(weak_sounds=", ".join(weak) or "any", interests=", ".join(interests) or "animals")
+    prompt = template.safe_substitute(weak_sounds=", ".join(weak) or "أي أصوات", interests=", ".join(interests) or "الحيوانات")
     text = _complete(prompt)
     text = text[text.find("{"): text.rfind("}") + 1]  # models without schema output may wrap JSON in prose or ``` fences
     try:

@@ -34,18 +34,18 @@ def next_exercise(game: str, history: list) -> dict:
     return {
         "game": game,
         "level": level,
-        "items": random.sample(["bat", "dad", "bed", "dog", "big", "dip", "bud", "dab"], 5),
+        "items": random.sample(["بَاب", "تَاج", "ثَوْب", "جَمَل", "حَبْل", "خُبْز", "دَار", "ذَهَب"], 5),
         "display_ms": {1: 2000, 2: 1500, 3: 1200}[level],
-        "reason": "practising b/d",
+        "reason": "نتدرّب على: ب / ت / ث",
     }
 
 
 def story(weak_sounds: list[str], interests: list[str]) -> dict:
     return {
-        "story": "Ben the dog had a big red ball. He ran to the bed and dug a deep den.",
+        "story": "ذَهَبَ سَامِي إِلَى البَحْرِ. رَأَى سَمَكَةً كَبِيرَةً. فَرِحَ سَامِي كَثِيرًا.",
         "questions": [
-            {"q": "What colour was the ball?", "answer": "red"},
-            {"q": "Where did Ben run?", "answer": "the bed"},
+            {"q": "إِلَى أَيْنَ ذَهَبَ سَامِي؟", "answer": "البَحْر"},
+            {"q": "مَاذَا رَأَى سَامِي؟", "answer": "سَمَكَة"},
         ],
     }
 
@@ -58,7 +58,7 @@ def progress(player_id: str) -> dict:
             "accuracy": round(0.55 + 0.06 * i, 2),
             "phoneme_accuracy": round(0.7 + 0.05 * i, 2),
             "avg_response_ms": 2200 - 150 * i,
-            "errors": {"letter_reversal": 5 - i, "missing_sound": 3 - i // 2},
+            "errors": {"dot_confusion": 5 - i, "vowel_error": 4 - i, "missing_sound": 3 - i // 2},
         }
         for i in range(5)
     ]}

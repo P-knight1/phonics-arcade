@@ -1,12 +1,13 @@
-Write a short, cheerful story for a reader who is practising reading aloud.
+اكتب قصة قصيرة مبهجة لقارئ مبتدئ يتدرب على القراءة بصوت عالٍ.
 
-Rules:
-- 60 to 100 words. Short sentences. Simple, everyday words that are easy to sound out.
-- Use many words that contain these sounds (IPA symbols): $weak_sounds
-- Set the story around these interests: $interests
-- Nothing scary, violent, sad or unkind.
+القواعد:
+- باللغة العربية الفصحى، مشكولة بالكامل: كل حرف عليه حركته (فتحة، ضمة، كسرة، سكون، شدة، تنوين).
+- من 60 إلى 100 كلمة. جمل قصيرة. كلمات بسيطة مألوفة يسهل تهجئتها.
+- استخدم كلمات كثيرة فيها هذه الأصوات (رموز IPA): $weak_sounds
+- اجعل القصة عن هذه الاهتمامات: $interests
+- لا شيء مخيف أو عنيف أو حزين أو قاسٍ.
 
-Then write 3 simple questions about the story. Each answer must be one or two words taken from the story.
+ثم اكتب 3 أسئلة بسيطة عن القصة، مشكولة بالكامل. كل جواب كلمة أو كلمتان مأخوذتان من القصة كما هي.
 
-Reply with JSON only, in this shape:
+أجب بصيغة JSON فقط، بهذا الشكل:
 {"story": "...", "questions": [{"q": "...", "answer": "..."}]}

@@ -3,7 +3,8 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, StringConstraints
 
-ErrorType = Literal["none", "letter_reversal", "missing_sound", "added_sound", "substitution", "no_response"]
+ErrorType = Literal["none", "letter_reversal", "missing_sound", "added_sound", "substitution", "no_response",
+                    "dot_confusion", "vowel_error", "vowel_length", "letter_position"]  # last 4: Arabic
 PlayerId = Annotated[str, Field(min_length=1, max_length=64)]
 Game = Annotated[str, Field(pattern=r"^[a-z_]{1,32}$")]  # also a content file name: no paths
 Interest = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=40)]

@@ -124,7 +124,7 @@ def test_next_exercise_levels_up_down_and_remembers(client, levels, login):
 
     good = [result(client, w, w) for w in ("cat", "hat", "mat")]
     up = ask(client, good, p1).json()
-    assert (up["level"], up["display_ms"], up["reason"]) == (2, 1500, "level up: two")
+    assert (up["level"], up["display_ms"], up["reason"]) == (2, 1500, "مستوى أعلى: two")
     assert ask(client, good, p1).json()["level"] == 2  # top level: stays
     assert ask(client, [], p1).json()["level"] == 2    # remembered between calls
 
@@ -140,14 +140,14 @@ def test_next_exercise_needs_three_results_to_move(client, levels, login):
 def test_next_exercise_targets_weak_sounds(client, levels, login):
     history = [result(client, "dad", "bab"), result(client, "dig", "big"), result(client, "cat", "cat")]
     r = ask(client, history, login(client)).json()
-    assert r["reason"] == "practising d"
+    assert r["reason"] == "نتدرّب على: د"
     assert r["items"][:2] == ["dad", "dig"] or r["items"][:2] == ["dig", "dad"]  # only two level-1 words have /d/
 
 
 def test_first_round_uses_recorded_weak_sounds(client, levels, login):
     p3 = login(client, "p3")
     say(client, "dad", "bab", p3)
-    assert ask(client, [], p3).json()["reason"] == "practising d"
+    assert ask(client, [], p3).json()["reason"] == "نتدرّب على: د"
     assert ask(client, [], login(client, "p4")).json()["reason"] == "one"  # a different player, a different round
 
 
@@ -169,7 +169,7 @@ def test_story_uses_llm_and_recorded_weak_sounds(client, monkeypatch, login):
     say(client, "dog", "bog", p1)
     r = client.post("/story", json={"player_id": p1[0], "weak_sounds": [], "interests": ["football"]}, headers=p1[1])
     assert r.status_code == 200 and r.json()["questions"][0]["answer"] == "Ben"
-    assert "sounds (IPA symbols): d" in prompts[0] and "interests: football" in prompts[0]
+    assert "(رموز IPA): d" in prompts[0] and "الاهتمامات: football" in prompts[0]
 
 
 def test_story_bad_llm_output_is_503(client, monkeypatch, login):
@@ -183,3 +183,38 @@ def test_story_without_vllm_config_is_503(client, monkeypatch, login):
     monkeypatch.delenv("VLLM_BASE_URL", raising=False)
     r = client.post("/story", json={"player_id": pid}, headers=auth)
     assert r.status_code == 503 and "not set" in r.json()["detail"]
+
+
+def test_score_arabic_heard_text(client):
+    r = say(client, "حَبْل", "جَبْل").json()
+    assert (r["target_phonemes"], r["heard_phonemes"], r["error_type"]) == (["ħ", "a", "b", "l"], ["dʒ", "a", "b", "l"],
+                                                                         "dot_confusion")
+
+
+def test_score_arabic_audio_keeps_vowel_length(client, monkeypatch):
+    monkeypatch.setattr(speech, "recognize", lambda audio, ctype: ("", ["k", "a", "t", "i", "b"]))
+    r = client.post("/score", data={"target": "كَاتِب"}, files={"audio": ("a.webm", b"x", "audio/webm")}).json()
+    assert (r["target_phonemes"], r["error_type"]) == (["k", "aː", "t", "i", "b"], "vowel_length")
+
+
+def test_bkt_moves_towards_the_evidence():
+    p = brain.P_INIT
+    assert brain.bkt(p, True) > p > brain.bkt(p, False)
+    for _ in range(20):
+        p = brain.bkt(p, True)
+    assert 0.95 < p <= 1
+
+
+def test_mastery_tracks_each_sound():
+    tries = [{"target_phonemes": ["d", "a", "d"], "heard_phonemes": ["b", "a", "b"]}] * 3
+    known = brain.mastery(tries)
+    assert known["d"] < brain.WEAK < known["a"]
+
+
+def test_practice_follows_mastery_not_one_bad_round(client, levels, login):
+    p = login(client, "steady")
+    for _ in range(4):
+        say(client, "dig", "big", p)   # d keeps going wrong
+    for _ in range(4):
+        say(client, "dad", "dad", p)   # ...until it is mastered
+    assert ask(client, [], p).json()["reason"] != "نتدرّب على: د"

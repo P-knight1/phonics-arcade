@@ -26,7 +26,7 @@ def test_guest_plays_like_a_player(client):
     client.post("/score", data={"target": "dog", "heard_text": "bog", "game": "word_flash"}, headers=auth)
     assert client.get(f"/progress/{pid}", headers=auth).json()["sessions"][0]["errors"] == {"letter_reversal": 1}
     r = client.post("/next-exercise", json={"player_id": pid, "game": "word_flash", "history": []}, headers=auth)
-    assert r.json()["reason"] == "practising d"  # personalised from this visit's mistakes
+    assert r.json()["reason"] == "نتدرّب على: د"  # personalised from this visit's mistakes
 
 
 def test_guests_are_separate(client):
@@ -67,7 +67,7 @@ def test_guest_interests_feed_the_story(client, monkeypatch):
     monkeypatch.setattr(brain, "_complete", lambda p: prompts.append(p) or json.dumps({"story": "s", "questions": []}))
     pid, auth = start_guest(client, {"interests": ["cooking"]})
     client.post("/story", json={"player_id": pid}, headers=auth)
-    assert "interests: cooking" in prompts[0]
+    assert "الاهتمامات: cooking" in prompts[0]
 
 
 def test_guests_work_in_mock_mode(mock_client):
