@@ -1,5 +1,5 @@
 {
-  "_note": "v1 Arabic starter list (MSA, fully vowelized) so the backend runs. Content owner replaces it. Levels go easiest first; level number = position (1-based). Final consonants carry a sukun (the pausal form a reader says). No final taa marbuta: espeak says it as t, readers stop on a.",
+  "_note": "v1 Arabic starter list (MSA, fully vowelized) so the backend runs. Levels go easiest first; level number = position (1-based). Words are scored in pause (backend/app/arabic_phonemes.py): a final vowel or tanwin may be read or left out, final taa marbuta is read as a stop on a. Writing the final sukun is still clearest for the reader.",
   "levels": [
     {"focus": "كَلِمَاتٌ قَصِيرَةٌ", "display_ms": 2000, "items": ["وَلَدْ", "قَمَرْ", "سَمَكْ", "مَلِكْ", "عَلَمْ", "قَلَمْ", "وَرَقْ", "دَرَسَ", "رَسَمَ", "أَكَلَ"]},
     {"focus": "حُرُوفٌ تَخْتَلِفُ بِالنُّقَطِ: ب ت ث، ج ح خ", "display_ms": 1800, "items": ["بَابْ", "تَاجْ", "ثَوْبْ", "تَمْرْ", "ثَلْجْ", "جَمَلْ", "جَبَلْ", "حَبْلْ", "خُبْزْ", "حَجَرْ"]},

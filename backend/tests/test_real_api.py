@@ -32,7 +32,7 @@ def test_score_no_answer(client):
 
 
 def test_score_audio_without_speech_packages_is_503(client, monkeypatch):
-    def unavailable(audio, ctype):
+    def unavailable(audio, ctype, arabic):
         raise speech.SpeechUnavailable("speech packages not installed")
 
     monkeypatch.setattr(speech, "recognize", unavailable)
@@ -63,13 +63,13 @@ def test_a_tap_on_the_mic_is_no_answer(client):
 
 
 def test_right_answer_shows_the_target_as_heard(client, monkeypatch):
-    monkeypatch.setattr(speech, "recognize", lambda audio, ctype: ("", ["d", "ɒ", "ɡ"]))
+    monkeypatch.setattr(speech, "recognize", lambda audio, ctype, arabic: ("", ["d", "ɒ", "ɡ"]))
     r = client.post("/score", data={"target": "dog"}, files={"audio": ("a.webm", b"x", "audio/webm")})
     assert (r.json()["correct"], r.json()["heard"]) == (True, "dog")
 
 
 def test_score_audio_uses_speech_module(client, monkeypatch):
-    monkeypatch.setattr(speech, "recognize", lambda audio, ctype: ("bog", ["b", "ˈɒ", "ɡ"]))
+    monkeypatch.setattr(speech, "recognize", lambda audio, ctype, arabic: ("bog", ["b", "ˈɒ", "ɡ"]))
     r = client.post("/score", data={"target": "dog"}, files={"audio": ("a.webm", b"x", "audio/webm")})
     assert r.json()["heard_phonemes"] == ["b", "ɒ", "g"] and r.json()["error_type"] == "letter_reversal"
 
@@ -169,7 +169,29 @@ def test_story_uses_llm_and_recorded_weak_sounds(client, monkeypatch, login):
     say(client, "dog", "bog", p1)
     r = client.post("/story", json={"player_id": p1[0], "weak_sounds": [], "interests": ["football"]}, headers=p1[1])
     assert r.status_code == 200 and r.json()["questions"][0]["answer"] == "Ben"
-    assert "(رموز IPA): d" in prompts[0] and "الاهتمامات: football" in prompts[0]
+    assert "والحركات: د" in prompts[0] and "الاهتمامات: football" in prompts[0]  # letters, not phoneme symbols
+
+
+def test_story_must_be_vowelized(client, monkeypatch, login):
+    pid, auth = login(client)
+    replies = iter(["ذهب الولد إلى السوق", "ذَهَبَ الْوَلَدُ إِلَى السُّوقِ"])
+    calls = []
+
+    def fake_llm(prompt):
+        calls.append(prompt)
+        return json.dumps({"story": next(replies), "questions": [{"q": "مَنْ ذَهَبَ؟", "answer": "الْوَلَدُ"}]})
+
+    monkeypatch.setattr(brain, "_complete", fake_llm)
+    r = client.post("/story", json={"player_id": pid}, headers=auth)
+    assert r.status_code == 200 and len(calls) == 2  # the unvowelized story was asked for again
+    monkeypatch.setattr(brain, "_complete", lambda prompt: json.dumps({"story": "ذهب الولد", "questions": []}))
+    assert client.post("/story", json={"player_id": pid}, headers=auth).status_code == 503
+
+
+def test_vowelized_share():
+    assert brain.vowelized_share("كَمْ كُرْبَةٍ ضَاقَ صَدْرِي") == 1.0
+    assert brain.vowelized_share("ذهب الولد") == 0.0
+    assert brain.vowelized_share("Ben the dog") == 1.0  # nothing Arabic to check
 
 
 def test_story_bad_llm_output_is_503(client, monkeypatch, login):
@@ -187,14 +209,18 @@ def test_story_without_vllm_config_is_503(client, monkeypatch, login):
 
 def test_score_arabic_heard_text(client):
     r = say(client, "حَبْل", "جَبْل").json()
-    assert (r["target_phonemes"], r["heard_phonemes"], r["error_type"]) == (["ħ", "a", "b", "l"], ["dʒ", "a", "b", "l"],
+    assert (r["target_phonemes"], r["heard_phonemes"], r["error_type"]) == (["H", "a", "b", "l"], ["j", "a", "b", "l"],
                                                                          "dot_confusion")
 
 
-def test_score_arabic_audio_keeps_vowel_length(client, monkeypatch):
-    monkeypatch.setattr(speech, "recognize", lambda audio, ctype: ("", ["k", "a", "t", "i", "b"]))
+def test_score_arabic_audio_uses_the_arabic_model(client, monkeypatch):
+    def recognize(audio, ctype, arabic):
+        assert arabic
+        return "", ["k", "a", "t", "i", "b"]
+
+    monkeypatch.setattr(speech, "recognize", recognize)
     r = client.post("/score", data={"target": "كَاتِب"}, files={"audio": ("a.webm", b"x", "audio/webm")}).json()
-    assert (r["target_phonemes"], r["error_type"]) == (["k", "aː", "t", "i", "b"], "vowel_length")
+    assert (r["target_phonemes"], r["error_type"]) == (["k", "aa", "t", "i", "b"], "vowel_length")
 
 
 def test_bkt_moves_towards_the_evidence():

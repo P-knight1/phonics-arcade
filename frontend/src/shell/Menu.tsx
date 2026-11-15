@@ -4,7 +4,6 @@ import { usePlayer } from "./session";
 const ITEMS = [
   { to: "/games/word-flash", title: "Word Flash", text: "Read the word before it hides." },
   { to: "/games/sound-surgery", title: "Sound Surgery", text: "Take a sound out, or swap it." },
-  { to: "/games/echo-chain", title: "Echo Chain", text: "Repeat a growing chain of sounds." },
   { to: "/games/story-recall", title: "Story Recall", text: "Read a story made for you." },
   { to: "/progress", title: "Progress", text: "See how you are doing." },
 ];

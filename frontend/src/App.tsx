@@ -31,7 +31,6 @@ export default function App() {
         <Route index element={<Menu />} />
         <Route path="games/word-flash" element={<WordFlash />} />
         <Route path="games/sound-surgery" element={<ComingSoon title="Sound Surgery" />} />
-        <Route path="games/echo-chain" element={<ComingSoon title="Echo Chain" />} />
         <Route path="games/story-recall" element={<ComingSoon title="Story Recall" />} />
         <Route path="progress" element={<ComingSoon title="Progress" />} />
         <Route path="*" element={<Navigate to="/" replace />} />

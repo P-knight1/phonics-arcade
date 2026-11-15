@@ -1,4 +1,4 @@
-"""Pydantic models for the frozen API contract (HANDOFF.md section 4)."""
+"""Pydantic models: the API shapes (docs/design.md section 2)."""
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, StringConstraints

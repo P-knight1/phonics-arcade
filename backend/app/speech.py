@@ -2,19 +2,24 @@
 
 Interface main.py relies on (keep it):
 
-    recognize(audio: bytes, content_type: str) -> tuple[str, list[str]]
-        returns (heard_text, heard_phonemes), e.g. ("", ["b", "ɑ", "ɡ"])
-        heard_phonemes  one IPA phoneme per item, raw from the model; main.py normalises them.
+    recognize(audio: bytes, content_type: str, arabic: bool = False) -> tuple[str, list[str]]
+        returns (heard_text, heard_phonemes), e.g. ("", ["k", "i", "t", "aa", "b"])
+        heard_phonemes  one phoneme per item, raw from the model; main.py normalises them.
         heard_text      empty for now: main.py shows the target when the answer is right.
         Silence gives ("", []). Raises SpeechUnavailable without the speech packages, BadAudio for unreadable audio.
 
-The model outputs espeak IPA, the same symbols app/g2p.py gives the targets, so they compare.
+Each model outputs the symbols app/g2p.py gives that language's targets, so they compare:
+Arabic: our fine-tuned model (ml/, Iqra'Eval symbols). English: the espeak IPA model it was fine-tuned from.
 """
 import io
+import os
 import threading
 from functools import lru_cache
+from pathlib import Path
 
-MODEL = "facebook/wav2vec2-lv-60-espeak-cv-ft"
+ENGLISH_MODEL = "facebook/wav2vec2-lv-60-espeak-cv-ft"
+# A local folder (ml/models/..., git-ignored) or a Hugging Face repo id. Trained on CC BY-NC data: non-commercial.
+ARABIC_MODEL = os.getenv("ARABIC_SPEECH_MODEL") or str(Path(__file__).resolve().parents[2] / "ml/models/arabic-phoneme")
 RATE = 16_000  # the model was trained on 16 kHz mono
 MIN_SECONDS = 0.2  # shorter than this is a tap, not an answer
 
@@ -46,32 +51,34 @@ def _decode(audio: bytes):
     return np.concatenate(chunks) if chunks else np.zeros(0, dtype=np.float32)
 
 
-@lru_cache(maxsize=1)
-def _load():
+@lru_cache(maxsize=2)
+def _load(name: str):
     try:
         import torch
         from transformers import AutoModelForCTC, AutoProcessor
     except ImportError as e:
         raise SpeechUnavailable("speech packages not installed: see backend/requirements-speech.txt") from e
+    if name == ARABIC_MODEL and not os.path.isdir(name) and not os.getenv("ARABIC_SPEECH_MODEL"):
+        raise SpeechUnavailable("Arabic speech model not found: train it (ml/README.md) or set ARABIC_SPEECH_MODEL")
     device = "cuda" if torch.cuda.is_available() else "cpu"  # NVIDIA, and AMD via PyTorch's ROCm build, both report as "cuda"
-    processor = AutoProcessor.from_pretrained(MODEL)
-    model = AutoModelForCTC.from_pretrained(MODEL).to(device).eval()
+    processor = AutoProcessor.from_pretrained(name)
+    model = AutoModelForCTC.from_pretrained(name).to(device).eval()
     return torch, processor, model, device
 
 
 def warm_up() -> None:
-    """Load the model before the first player speaks (the first load downloads ~1.3 GB)."""
+    """Load the Arabic model before the first player speaks. English loads on its first use."""
     try:
-        _load()
+        _load(ARABIC_MODEL)
     except SpeechUnavailable:
         pass
 
 
-def recognize(audio: bytes, content_type: str) -> tuple[str, list[str]]:
+def recognize(audio: bytes, content_type: str, arabic: bool = False) -> tuple[str, list[str]]:
     samples = _decode(audio)
     if len(samples) < MIN_SECONDS * RATE:
         return "", []
-    torch, processor, model, device = _load()
+    torch, processor, model, device = _load(ARABIC_MODEL if arabic else ENGLISH_MODEL)
     inputs = processor(samples, sampling_rate=RATE, return_tensors="pt")
     with _lock, torch.inference_mode():
         ids = model(inputs.input_values.to(device)).logits.argmax(-1)

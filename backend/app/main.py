@@ -60,7 +60,7 @@ def score(
     target: str = Form(..., min_length=1, max_length=300),  # up to one story sentence
     audio: UploadFile | None = File(None),
     shown_at_ms: int | None = Form(None),
-    # Optional additions, proposed in HANDOFF.md section 4: tag the game / score typed text in debug mode.
+    # Optional: tag the attempt with its game, or score typed text instead of audio (debug mode).
     game: str = Form("", pattern=r"^[a-z_]{0,32}$"),
     heard_text: str | None = Form(None, max_length=300),
     player: str | None = Depends(optional_player),  # logged in: the attempt is saved to this player
@@ -81,12 +81,12 @@ def score(
         if len(data) > MAX_AUDIO_BYTES:
             raise HTTPException(413, "Audio too large")
         try:
-            heard, heard_ph = speech.recognize(data, audio.content_type or "")
+            heard, heard_ph = speech.recognize(data, audio.content_type or "", arabic=scoring.is_arabic(target))
         except speech.SpeechUnavailable as e:
             raise HTTPException(503, str(e))
         except speech.BadAudio as e:
             raise HTTPException(422, str(e))
-        heard_ph = scoring.normalize(heard_ph, keep_length=scoring.is_arabic(target))
+        heard_ph = scoring.normalize(heard_ph)
 
     result = {
         "heard": heard,

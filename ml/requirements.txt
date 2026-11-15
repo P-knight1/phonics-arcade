@@ -1,0 +1,6 @@
+# torch/torchaudio come from the CUDA index first (see README), then:
+transformers==5.23.0
+huggingface_hub==2.4.0
+numpy==2.5.4
+pyarrow==26.0.1
+av==19.0.2

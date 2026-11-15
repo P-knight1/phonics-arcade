@@ -17,26 +17,20 @@ def test_punctuation_and_empty():
 
 
 @pytest.mark.parametrize("word, expected", [
-    # espeak-ng 'ar' output, as checked by hand. Length (ː) is kept for Arabic.
-    ("بَاب", "b aː b"), ("كَتَبَ", "k a t a b a"), ("كَاتِب", "k aː t i b"),
-    ("تَاج", "t aː dʒ"), ("ثَوْب", "θ a u b"),                    # ت ث; و after fatha is a diphthong "a u"
-    ("جَمَل", "dʒ a m a l"), ("حَبْل", "ħ a b l"), ("خُبْز", "χ u b z"),
-    ("ذَهَب", "ð a h a b"), ("رَمْل", "r a m l"), ("زَيْت", "z a i t"), ("شَمْس", "ʃ a m s"),
-    ("عَيْن", "ʕ a i n"), ("غَيْم", "ɣ a i m"), ("قَلَم", "q a l a m"), ("فِيل", "f iː l"), ("نُور", "n uː r"),
-    # emphatics: the vowel after them is marked with "."; ظ is ð like ذ
-    ("صَبَرَ", "s̪ a. b a r a"), ("ضَرَبَ", "dˤ a. r a b a"), ("طِين", "t̪ i.ː n"), ("ظُفْر", "ð u. f r"),
-    ("سُكَّر", "s u kː a r"), ("حَمَّام", "ħ a m m aː m"),          # shadda: sometimes ː, sometimes doubled
-    ("كِتَابٌ", "k i t aː b u n"), ("قَلَمًا", "q a l a m a n"),    # tanween
-    ("مَدْرَسَة", "m a d r a s a t"),                              # taa marbuta always t
-    ("اَلْقَمَرُ", "ʔ a l q a m a r u"), ("الشَّمْسُ", "ʔ a ʃ ʃ a m s u"),  # moon / sun letter (alif lam unmarked)
-    ("فَأْر", "f a ʔ r"),
+    # Arabic goes through app/arabic_phonemes.py (its own self-check covers the reading rules)
+    ("بَاب", "b aa b"), ("كَتَبَ", "k a t a b"), ("كَاتِب", "k aa t i b"),   # last word read in pause
+    ("حَبْل", "H a b l"), ("ثَوْب", "^ a w b"), ("ذَهَب", "* a h a b"), ("شَمْس", "$ a m s"),
+    ("صَبَرَ", "S a b a r"), ("ضَرَبَ", "D a r a b"), ("طِين", "T ii n"), ("ظُفْر", "Z u f r"),
+    ("سُكَّر", "s u kk a r"),                                    # shadda = doubled symbol
+    ("كِتَابٌ", "k i t aa b"),                                    # tanwin dropped in pause
+    ("الشَّمْسُ", "< a $$ a m s"),                                # sun letter
 ])
 def test_arabic(word, expected):
     assert g2p.phonemes(word) == tuple(expected.split())
 
 
-def test_arabic_vowel_before_shadda_is_kept():
-    # espeak drops the fatha when it is typed before the shadda (the Unicode NFC order); g2p reorders it
-    shadda_first = "سُكّ" + "َ" + "ر"
-    vowel_first = "سُك" + "َ" + "ّ" + "ر"
-    assert g2p.phonemes(vowel_first) == g2p.phonemes(shadda_first) == ("s", "u", "kː", "a", "r")
+def test_arabic_converter_matches_ml_copy():
+    from pathlib import Path
+    ml = Path(__file__).resolve().parents[2] / "ml" / "arabic_phonemes.py"
+    if ml.exists():  # the backend copy must stay identical to the one the model was trained with
+        assert ml.read_bytes() == (Path(g2p.__file__).parent / "arabic_phonemes.py").read_bytes()
