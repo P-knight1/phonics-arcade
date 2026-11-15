@@ -92,7 +92,7 @@ def test_story_uses_profile_interests(client, monkeypatch):
     monkeypatch.setattr(brain, "_complete", lambda p: prompts.append(p) or json.dumps({"story": "s", "questions": []}))
     sam = register(client).json()
     client.post("/story", json={"player_id": sam["player_id"]}, headers=bearer(sam["token"]))
-    assert "الاهتمامات: football, space" in prompts[0]
+    assert "الاهتمامات: football، space" in prompts[0]
 
 
 def test_progress_phoneme_accuracy_and_game_filter(client, login):

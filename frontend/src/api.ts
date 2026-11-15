@@ -1,5 +1,5 @@
-// The single API client. Every call to the backend goes through here (HANDOFF.md section 10).
-// Shapes mirror backend/app/schemas.py, which is the frozen contract in HANDOFF.md section 4.
+// The single API client: every call to the backend goes through here.
+// Shapes mirror backend/app/schemas.py.
 
 export type ErrorType =
   | "none"

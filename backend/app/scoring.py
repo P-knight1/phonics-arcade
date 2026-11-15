@@ -5,26 +5,25 @@ from difflib import SequenceMatcher
 ARABIC = re.compile(r"[\u0621-\u064a]")  # Arabic letters (hamza to yeh), not the vowel marks
 # English: mirror-letter confusions as they show up in sound. p/q has no clean phoneme pair (q is /k/), so only b/d.
 REVERSAL_PAIRS = {frozenset({"b", "d"})}
-# Arabic letters that differ only by dots, as espeak-ng 'ar' phonemes: ب ت ث، ج ح خ، د ذ، ر ز، س ش، ص ض، ط ظ، ع غ، ف ق.
-# espeak gives ظ the same ð as ذ, so ð is in two families.
-DOT_FAMILIES = [{"b", "t", "θ"}, {"dʒ", "ħ", "χ"}, {"d", "ð"}, {"r", "z"}, {"s", "ʃ"}, {"s̪", "dˤ"}, {"t̪", "ð"}, {"ʕ", "ɣ"},
+# Arabic letters that differ only by dots, in our Arabic symbol set (app/arabic_phonemes.py):
+# ب ت ث، ج ح خ، د ذ، ر ز، س ش، ص ض، ط ظ، ع غ، ف ق.
+DOT_FAMILIES = [{"b", "t", "^"}, {"j", "H", "x"}, {"d", "*"}, {"r", "z"}, {"s", "$"}, {"S", "D"}, {"T", "Z"}, {"E", "g"},
                 {"f", "q"}]
-SHORT_VOWELS = {"a", "i", "u"}  # espeak 'ar' marks a vowel after an emphatic with ".", e.g. "a.", "a.ː"
-# Stress, length and word-break marks: the phoneme model and espeak disagree on these, the player can't hear them.
+SHORT_VOWELS = {"a", "i", "u"}
+LONG_VOWELS = {"aa", "ii", "uu"}
+# English only: stress, length and word-break marks; the phoneme model and espeak disagree on these.
 _STRIP = str.maketrans("", "", "ˈˌː|")
-_STRIP_KEEP_LENGTH = str.maketrans("", "", "ˈˌ|")  # Arabic: length changes the word (كَتَبَ vs كَاتَب)
 
 
 def is_arabic(text: str) -> bool:
     return bool(ARABIC.search(text))
 
 
-def normalize(phonemes, keep_length: bool = False) -> list[str]:
-    """Make target (espeak) and heard (phoneme model) phonemes comparable. keep_length for Arabic."""
-    strip = _STRIP_KEEP_LENGTH if keep_length else _STRIP
+def normalize(phonemes) -> list[str]:
+    """English: make target (espeak) and heard (phoneme model) phonemes comparable. Arabic symbols need nothing."""
     out = []
     for p in phonemes:
-        p = p.translate(strip).replace("ɡ", "g")  # espeak's IPA ɡ vs plain g
+        p = p.translate(_STRIP).replace("ɡ", "g")  # espeak's IPA ɡ vs plain g
         if p:
             out.append(p)
     return out
@@ -46,13 +45,13 @@ def missed_phonemes(target: list[str], heard: list[str]) -> list[str]:
     return [p for tag, i1, i2, _, _ in _diffs(target, heard) if tag in ("replace", "delete") for p in target[i1:i2]]
 
 
-def _vowel(p: str) -> str:
-    """'a.ː' -> 'a': the vowel without length or emphatic mark."""
-    return p.replace("ː", "").rstrip(".")
+def single(p: str) -> str:
+    """'bb' (shadda) -> 'b'. Long vowels ('aa') are not shadda and stay."""
+    return p[0] if len(p) == 2 and p[0] == p[1] and p not in LONG_VOWELS else p
 
 
 def _dot_pair(a: str, b: str) -> bool:
-    pair = {a.rstrip("ː"), b.rstrip("ː")}  # ː here is a shadda: ب read as تّ is still a dot confusion
+    pair = {single(a), single(b)}  # ب read as تّ is still a dot confusion
     return len(pair) == 2 and any(pair <= f for f in DOT_FAMILIES)
 
 
@@ -77,9 +76,9 @@ def error_type(target: list[str], heard: list[str], target_text: str = "", heard
             return "letter_position"
         if any(_dot_pair(a, b) for a, b in pairs):
             return "dot_confusion"
-        if any(_vowel(a) == _vowel(b) in SHORT_VOWELS and ("ː" in a) != ("ː" in b) for a, b in pairs):
+        if any(a != b and a[0] == b[0] and {a, b} <= SHORT_VOWELS | LONG_VOWELS for a, b in pairs):  # a <-> aa
             return "vowel_length"
-        if any(_vowel(a) != _vowel(b) and {_vowel(a), _vowel(b)} <= SHORT_VOWELS and "ː" not in a + b for a, b in pairs):
+        if any(a != b and {a, b} <= SHORT_VOWELS for a, b in pairs):
             return "vowel_error"
     else:
         t, h = target_text.strip().lower(), heard_text.strip().lower()
@@ -97,7 +96,19 @@ def error_type(target: list[str], heard: list[str], target_text: str = "", heard
     return "substitution"
 
 
+def _without_final_vowel(target: list[str], heard: list[str]) -> list[str]:
+    """Arabic targets end in pause (كَتَبَ -> k a t a b); reading the final vowel or tanwin in full is right too."""
+    if target and target[-1] not in SHORT_VOWELS:
+        for n in (2, 1):  # vowel + n (tanwin), then a lone vowel
+            tail = heard[-n:]
+            if len(heard) > n and heard[-n - 1] == target[-1] and tail[0] in SHORT_VOWELS and tail[1:] == ["n"][:n - 1]:
+                return heard[:-n]
+    return heard
+
+
 def score(target: list[str], heard: list[str], target_text: str = "", heard_text: str = "") -> dict:
+    if is_arabic(target_text):
+        heard = _without_final_vowel(target, heard)
     return {
         "correct": heard == target,
         "phoneme_accuracy": phoneme_accuracy(target, heard),

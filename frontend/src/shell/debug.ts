@@ -1,4 +1,4 @@
-// Debug mode (HANDOFF.md section 5): "?debug=1" shows the placeholder answer buttons under the mic.
+// Debug mode: "?debug=1" shows typed-answer buttons under the mic, so every game works without the model.
 // It is remembered for the tab, so it survives moving between pages. "?debug=0" turns it off.
 const KEY = "phonics-arcade.debug";
 

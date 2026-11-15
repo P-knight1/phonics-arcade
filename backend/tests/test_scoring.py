@@ -1,6 +1,6 @@
 import pytest
 
-from app.scoring import missed_phonemes, normalize, score
+from app.scoring import missed_phonemes, normalize, score, single
 
 
 @pytest.mark.parametrize("target, heard, correct, acc, err", [
@@ -32,25 +32,40 @@ def test_missed_phonemes():
 
 
 @pytest.mark.parametrize("target, heard, err", [
-    ("ħ a b l", "dʒ a b l", "dot_confusion"),          # حَبْل read as جَبْل
-    ("b aː b", "t aː b", "dot_confusion"),             # بَاب read as تَاب
-    ("s̪ a. b r", "dˤ a. b r", "dot_confusion"),        # ص / ض
-    ("d u bː", "d u tː", "dot_confusion"),             # shadda kept on both sides
-    ("f a t a ħ a", "f u t a ħ a", "vowel_error"),     # فَتَحَ with a wrong short vowel
-    ("k aː t i b", "k a t i b", "vowel_length"),       # كَاتِب read as كَتِب
-    ("t̪ a.ː r a", "t̪ a. r a", "vowel_length"),         # emphatic long a
+    ("H a b l", "j a b l", "dot_confusion"),           # حَبْل read as جَبْل
+    ("b aa b", "t aa b", "dot_confusion"),             # بَاب read as تَاب
+    ("S a b r", "D a b r", "dot_confusion"),           # ص / ض
+    ("d u bb", "d u tt", "dot_confusion"),             # shadda on both sides
+    ("d u bb", "d u t", "dot_confusion"),              # ب with shadda read as plain ت: still the dots
+    ("f a t a H a", "f u t a H a", "vowel_error"),     # فَتَحَ with a wrong short vowel
+    ("k aa t i b", "k a t i b", "vowel_length"),       # كَاتِب read as كَتِب
+    ("k i t a b", "k i t aa b", "vowel_length"),       # and the other way
     ("k a t a b a", "k a b a t a", "letter_position"),  # كَتَبَ -> كَبَتَ
-    ("ħ a b l", "ħ a l b", "letter_position"),
-    ("b aː b", "b aː", "missing_sound"),
-    ("b aː b", "b aː b a", "added_sound"),
+    ("H a b l", "H a l b", "letter_position"),
+    ("b aa b", "b aa", "missing_sound"),
+    ("b aa b", "b aa b t", "added_sound"),
     ("q a l a m", "k a l a m", "substitution"),        # not a dot pair
-    ("b aː b", "d aː b", "substitution"),              # b/d is only a reversal in English
-    ("b u", "b u.", "substitution"),                   # emphasis only, not a vowel error
-    ("d u bː", "d u b", "substitution"),               # shadda dropped
-    ("b aː b", "b iː b", "substitution"),              # long vowels are letters (ا / ي)
+    ("b aa b", "d aa b", "substitution"),              # b/d is only a reversal in English
+    ("d u bb", "d u b", "substitution"),               # shadda dropped
+    ("b aa b", "b ii b", "substitution"),              # long vowels are letters (ا / ي)
 ])
 def test_arabic_error_types(target, heard, err):
     assert score(target.split(), heard.split(), "كَلِمَة")["error_type"] == err
+
+
+@pytest.mark.parametrize("target, heard", [
+    ("k a t a b", "k a t a b a"),      # كَتَبَ read in full instead of in pause
+    ("k i t aa b", "k i t aa b u n"),  # كِتَابٌ with its tanwin
+    ("k i t aa b", "k i t aa b"),
+])
+def test_arabic_final_vowel_is_optional(target, heard):
+    assert score(target.split(), heard.split(), "كَلِمَة")["correct"]
+
+
+def test_arabic_final_vowel_tolerance_is_narrow():
+    assert score("m i n".split(), "m i".split(), "مِنْ")["error_type"] == "missing_sound"
+    assert score("b aa b".split(), "b aa t a".split(), "بَاب")["error_type"] == "dot_confusion"
+    assert score("d a r s".split(), "d a r s a".split(), "dars")["error_type"] == "added_sound"  # English: no pause rule
 
 
 def test_arabic_precedence():
@@ -61,22 +76,31 @@ def test_arabic_precedence():
 
 
 def test_english_unchanged_without_arabic_text():
-    assert score("ħ a b l".split(), "dʒ a b l".split(), "")["error_type"] == "substitution"
+    assert score("H a b l".split(), "j a b l".split(), "")["error_type"] == "substitution"
 
 
-def test_normalize_keeps_length_for_arabic():
-    assert normalize(["k", "aː", "t", "|", "bː"], keep_length=True) == ["k", "aː", "t", "bː"]
+def test_normalize_leaves_arabic_symbols_alone():
+    assert normalize(["k", "aa", "t", "bb", "$", "^", "<", "*"]) == ["k", "aa", "t", "bb", "$", "^", "<", "*"]
+
+
+def test_single():
+    assert [single(p) for p in ("bb", "b", "aa", "$$")] == ["b", "b", "aa", "$"]
 
 
 def test_missed_phonemes_and_weak_sounds_arabic():
     from app.brain import weak_sounds
-    assert missed_phonemes(["k", "aː", "t", "i", "b"], ["k", "a", "t", "i", "b"]) == ["aː"]
+    assert missed_phonemes(["k", "aa", "t", "i", "b"], ["k", "a", "t", "i", "b"]) == ["aa"]
     results = [{"correct": False, "target_phonemes": t.split(), "heard_phonemes": h.split()}
-               for t, h in [("ħ a b l", "dʒ a b l"), ("ħ a dʒ a r", "χ a dʒ a r"), ("b aː b", "b a b")]]
-    assert weak_sounds(results) == ["ħ", "aː"]
+               for t, h in [("H a b l", "j a b l"), ("H a j a r", "x a j a r"), ("b aa b", "b a b")]]
+    assert weak_sounds(results) == ["H", "aa"]
 
 
 def test_every_dot_letter_sound_has_a_letter_to_show():
     from app.brain import LETTER_FOR
     from app.scoring import DOT_FAMILIES
     assert set().union(*DOT_FAMILIES) <= LETTER_FOR.keys()
+
+
+def test_letters_shown_for_sounds():
+    from app.brain import letter
+    assert [letter(p) for p in ("H", "bb", "aa", "a", "?")] == ["ح", "بّ", "ا", "الفتحة", "?"]

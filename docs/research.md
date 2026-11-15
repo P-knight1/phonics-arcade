@@ -1,6 +1,6 @@
 # Research: Arabic dyslexia, competitors, evidence and technology
 
-Collected 14–15 Nov 2026 for the Kuwait Dyslexia Association (KDA) AI competition (deadline 30 Nov). Every claim has a source at the end of its section; primary sources (journal, PubMed/PMC, registry, official repo) were checked on 15 Nov unless marked otherwise. **"Unverified" marks a claim we could only see in a secondary source or abstract: don't quote it in the pitch until someone reads the original.**
+Collected 14–15 Nov 2026 for the Kuwait Dyslexia Association (KDA) AI competition (deadline 30 Nov). Every claim has a source at the end of its section; primary sources (journal, PubMed/PMC, registry, official repo) were checked on 15 Nov unless marked otherwise. **"Unverified" marks a claim we could only see in a secondary source or abstract: don't quote it in the pitch until the original has been read.**
 
 **Positioning in one line:** the first Arabic reading tool that listens to a child read aloud, recognises *Arabic-specific* dyslexic error patterns (short vowels, dot-letters, letter position), and adapts practice to them, using methods with published evidence. Target users: children. **Pilot: adults only** (usability and scoring accuracy, not efficacy). No medical claims: practice and support, never diagnosis.
 
@@ -16,7 +16,7 @@ Collected 14–15 Nov 2026 for the Kuwait Dyslexia Association (KDA) AI competit
 | **Letter shape changes with position** (initial, middle, final, isolated) | Extra visual load | UI: generous spacing, larger marks (section 6) |
 | **Diglossia**: children speak a dialect but read Modern Standard Arabic | Strong impact on reading in dyslexic children. A Kuwait study of primary pupils found MSA and shared words easier to read than dialect-only words, and phonological awareness was the only unique predictor of reading | Start with words shared between Kuwaiti dialect and MSA; accept regular dialect pronunciations in scoring (section 4.1) |
 | **Morphology**: words are built from roots + patterns (ك ت ب → كَتَبَ، كاتِب، مَكتَب) | Morphological awareness is the **strongest predictor of reading comprehension** in Arabic children; phonological awareness also matters | A root-and-pattern game is a real, Arabic-only innovation |
-| **Vowel length is meaningful** (كَتَبَ vs كاتَب) | Long vs short vowels change the word | Done: Arabic keeps the length mark `ː` in `scoring.normalize()` (English still drops it, for accents) |
+| **Vowel length is meaningful** (كَتَبَ vs كاتَب) | Long vs short vowels change the word | Long and short vowels are separate symbols (`aa` vs `a`), so `vowel_length` is its own error type |
 
 **Theory to cite:** Saiegh-Haddad's MAWRID model of Arabic word reading names three shaping features: vowelization, morphology and diglossia. Friedmann & Haddad-Hanna describe the Arabic dyslexia subtypes (vowel dyslexia, letter position dyslexia).
 
@@ -70,10 +70,10 @@ Sources: [Read Along "permissive" quote (Khaleej Times, Sept 2020)](https://www.
 
 | Need | Options found | Recommendation |
 |---|---|---|
-| **Target text → phonemes** | espeak-ng Arabic (already in our stack): tested, بَاب → `b aː b`, كَتَبَ → `k a t a b a`; needs vowelized text. Iqra'Eval's **MSA phonetiser** (GitHub `Iqra-Eval/MSA_phonetiser`): **no licence file**, so legally "all rights reserved" until they add one | Use espeak now. If we switch to an Iqra'Eval model, ask the authors for a licence before shipping their phonetiser |
-| **Audio → phonemes** | Current model `wav2vec2-lv-60-espeak-cv-ft`: multilingual, **Arabic coverage unknown** (model card silent). **Iqra'Eval publishes checkpoints** on Hugging Face (`IqraEval/Iqra_wav2vec2_base`, `_hubert_base`, `_mhubert_base`, `_wavlm_base`), all **Apache-2.0**; its datasets (`Iqra_train`, `QuranMB.v2`, …) are **CC BY-NC 4.0** (no commercial use). Their domain is Qur'anic recitation, not children's MSA reading. Shared-task winner AraS2P fine-tuned Wav2Vec2-BERT | **Step 1:** test the current model on real Arabic recordings (1 day). **Step 2, if weak:** an Iqra'Eval Apache-2.0 checkpoint. Any fine-tune on their CC BY-NC data must stay non-commercial |
+| **Target text → phonemes** | espeak-ng Arabic: measured 16.6% disagreement with Iqra'Eval's expert labels (wrong on hamzat al-wasl, sun letters, shadda on و/ي, pausal forms). Iqra'Eval's **MSA phonetiser** (GitHub `Iqra-Eval/MSA_phonetiser`): **no licence file**, so legally "all rights reserved" | **Done:** our own converter, written from scratch in the Iqra'Eval symbol set (`ml/arabic_phonemes.py`): 0.6% disagreement with the labels (`ml/RESULTS.md`) |
+| **Audio → phonemes** | `wav2vec2-lv-60-espeak-cv-ft` (multilingual): measured **34.2%** phoneme error rate on held-out Arabic. **Iqra'Eval** publishes checkpoints (`IqraEval/Iqra_wav2vec2_base` etc., **Apache-2.0**; official baseline 11.8%, not a Hugging Face CTC model) and data (`Iqra_train`: Common Voice Arabic read MSA with vowelized text and phoneme labels, **CC BY-NC 4.0**). Shared-task winner AraS2P fine-tuned Wav2Vec2-BERT | **Done:** we fine-tuned `wav2vec2-lv-60-espeak-cv-ft` on `Iqra_train`: **9.75%** on all 79 h (3 h of training), better than the official baseline (`ml/RESULTS.md`). Non-commercial because of the data licence; a product would relabel Common Voice (CC0) with our converter |
 | **Vowel marks on generated text** (stories) | Mishkal, Rababa, pipeline-diacritizer, CATT (used by SILMA) | Our word lists are written vowelized by hand. Only LLM stories need a diacritizer, or an LLM asked for full tashkeel plus a check |
-| **Audio prompts** (Echo Chain, "hear the word") | **SILMA TTS** official: GitHub `SILMA-AI/silma-tts` (code **MIT**) and Hugging Face `silma-ai/silma-tts` (weights **Apache-2.0**, not gated); 150M parameters, Arabic + English, F5-TTS based. Other Hugging Face copies are unofficial mirrors. ArVoice dataset: diacritized MSA | Record the small fixed set (syllables, words) with a team voice; use SILMA TTS only for generated text, downloaded from the official repo |
+| **Audio prompts** (Echo Chain, "hear the word") | **SILMA TTS** official: GitHub `SILMA-AI/silma-tts` (code **MIT**) and Hugging Face `silma-ai/silma-tts` (weights **Apache-2.0**, not gated); 150M parameters, Arabic + English, F5-TTS based. Other Hugging Face copies are unofficial mirrors. ArVoice dataset: diacritized MSA | Record the small fixed set (syllables, words) with a human voice; use SILMA TTS only for generated text, downloaded from the official repo |
 | **Speech data** | **Common Voice:** since Oct 2025 new releases come only from Mozilla Data Collective (account + terms of service); the clips stay **CC0**. Children's Arabic: **Arabic Little STT** (Levantine, 288 children aged 6–13, 355 utterances, CC BY 4.0); **Abjad-Kids** (46,397 clips of letters, numbers, colours, ages 3–12; dataset licence not stated in the paper); **ASMDD** (100 Egyptian children aged 2–8, 100 isolated words with mispronunciation labels; **no licence stated**) | None is a children's MSA read-aloud corpus with an open licence. For the adult pilot, use our own consented recordings; ask the authors before using ASMDD or Abjad-Kids |
 | **Accents and dialects** | Read Along is accent-permissive by design. Kuwaiti mappings: section 4.1 | Accept the regular dialect pronunciations in 4.1; still flag dot-letter and vowel errors |
 
@@ -99,19 +99,17 @@ Sources: [Al-Qenaie 2011, Durham thesis (record)](https://etheses.durham.ac.uk/i
 
 ---
 
-## 5. Arabic error types (proposed backend change)
+## 5. Arabic error types
 
-Today's English `error_type` values stay, and these are added for Arabic:
+Implemented in `backend/app/scoring.py` ([design.md](design.md) section 3):
 
 | `error_type` | Example | How we detect it |
 |---|---|---|
 | `dot_confusion` | ب read as ت (`b`→`t`), ج↔ح↔خ | A substitution between letters of the same dot-family (minus the dialect pairs in 4.1, e.g. ض/ظ) |
 | `vowel_error` | فَتَحَ read with a wrong short vowel | A substitution among short vowels `a i u` |
-| `vowel_length` | كاتِب read as كَتِب | Long ↔ short vowel (`aː`↔`a`); needs `ː` kept |
+| `vowel_length` | كاتِب read as كَتِب | Long ↔ short vowel (`aa`↔`a`) |
 | `letter_position` | Two letters swapped in order | An adjacent transposition in the phoneme sequence |
 | existing | `missing_sound`, `added_sound`, `substitution`, `no_response`, `none` | Unchanged |
-
-**Contract note:** this extends the error list, so the frontend's feedback wording needs entries for the new types.
 
 ---
 
@@ -130,9 +128,9 @@ Sources: [Arabolexia study](https://ijaes2011.net/index.php/IJAES/article/view/8
 Pilot = adults only, testing usability and scoring accuracy (not efficacy). Practical steps:
 
 1. **Information sheet + consent form** in Arabic and English: purpose, what is recorded, how long it is kept, who sees it, the right to stop at any time without giving a reason. Taking part is a separate ethical consent from any legal basis for processing the data.
-2. **Adults only, no vulnerable groups:** no minors and no one recruited through a dependency (students of a team member, employees).
+2. **Adults only, no vulnerable groups:** no minors and no one recruited through a dependency (the author's students or employees).
 3. **Collect the minimum:** a pseudonym ID, age band and dialect only; no names or civil IDs stored with recordings. Record only the reading tasks.
-4. **Recordings:** stored encrypted, outside git and outside the public repo, on a team-controlled drive; access limited to named team members.
+4. **Recordings:** stored encrypted, outside git and outside the public repo, on a private drive; only the project author has access.
 5. **Retention:** delete raw audio when the evaluation is done (set a date, e.g. 31 Dec 2026); keep only scores and anonymised error counts. Delete a person's data on request.
 6. **No third-party processing** of audio beyond our own server; say so in the information sheet.
 7. **Wording:** "practice tool", never "test" or "diagnosis"; give no individual feedback that sounds clinical.
@@ -154,13 +152,11 @@ Sources: [Al-Jarida 2017 (Arabic)](https://www.aljarida.com/articles/14855936043
 
 ---
 
-## 9. Still missing (decide or find out)
+## 9. Still open
 
-1. **Competition rules:** nothing is public. Ask KDA for judging criteria, what "innovation" means to them, submission format, and whether a working demo is required.
-2. **Does our phoneme model hear Arabic?** One afternoon: record 20 vowelized words, compare with espeak. If weak, try an Iqra'Eval Apache-2.0 checkpoint.
-3. **Dialect list (4.1):** a native Kuwaiti speaker checks it before we tune `scoring.normalize()`.
-4. **Pilot paperwork:** write the information sheet and consent form from section 7; fix the deletion date.
-5. **Kuwait prevalence:** only a 2017 newspaper figure exists. Ask KDA whether the survey was published; otherwise quote Aldakhil 2024 only.
-6. **Iqra'Eval phonetiser licence:** ask the authors, or keep espeak.
-7. **Word lists:** vowelized, organised by letter families (dot pairs), syllable shapes and roots. The content owner builds these from section 1.
-8. **Unverified, read before quoting:** the 2025 digital-intervention meta-analysis (g≈0.42), the UAE ChatGPT study, Amal's "speech therapy" claim.
+1. **Competition rules:** nothing is public. Ask KDA for judging criteria, submission format, and whether a working demo is required.
+2. **Dialect list (4.1):** a native Kuwaiti speaker checks it before scoring tolerates dialect pronunciations.
+3. **Pilot paperwork:** write the information sheet and consent form from section 7; fix the deletion date.
+4. **Kuwait prevalence:** only a 2017 newspaper figure exists. Ask KDA whether the survey was published; otherwise quote Aldakhil 2024 only.
+5. **Word lists:** grow them by letter family (dot pairs), syllable shape and root, from section 1.
+6. **Unverified, read before quoting:** the 2025 digital-intervention meta-analysis (g≈0.42), the UAE ChatGPT study, Amal's "speech therapy" claim.
