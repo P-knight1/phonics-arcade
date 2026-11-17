@@ -1,0 +1,9 @@
+{
+  "_note": "Rhythmic Reading: one word per slot, read aloud on a steady beat (two beats per slot; the word shows on the first beat). display_ms is the slot length, so lower levels are slower. Words are scored in pause like every target.",
+  "levels": [
+    {"focus": "إِيقَاعٌ هَادِئٌ: كَلِمَاتٌ قَصِيرَةٌ", "display_ms": 3000, "items": ["بَابْ", "بَيْتْ", "قَلَمْ", "وَلَدْ", "سَمَكْ", "جَمَلْ", "شَمْسْ", "قَمَرْ"]},
+    {"focus": "حُرُوفٌ تَخْتَلِفُ بِالنُّقَطِ عَلَى الْإِيقَاعِ", "display_ms": 2400, "items": ["حَبْلْ", "جَبَلْ", "خُبْزْ", "تَاجْ", "ثَوْبْ", "بَحْرْ", "زَيْتْ", "رَمْلْ"]},
+    {"focus": "حُرُوفُ الْمَدِّ عَلَى الْإِيقَاعِ", "display_ms": 2000, "items": ["كِتَابْ", "كَاتِبْ", "فِيلْ", "نُورْ", "سُوقْ", "دِيكْ", "طَارَ", "نَامَ"]},
+    {"focus": "إِيقَاعٌ أَسْرَعُ", "display_ms": 1600, "items": ["كَتَبَ", "دَرَسَ", "رَسَمَ", "أَكَلَ", "ذَهَبَ", "جَلَسَ", "لَعِبَ", "شَرِبَ"]}
+  ]
+}

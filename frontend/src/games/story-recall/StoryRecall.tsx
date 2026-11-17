@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as api from "../../api";
 import AnswerControls from "../../shell/AnswerControls";
+import CoachNote from "../../shell/CoachNote";
 import { FEEDBACK } from "../../shell/feedback";
 import { BackLink } from "../../shell/round";
 import { usePlayer } from "../../shell/session";
@@ -8,8 +9,9 @@ import { useScorer, type SpokenAnswer } from "../../shell/useScorer";
 
 const GAME = "story_recall";
 const TITLE = "قصتي";
+const READINGS = 3; // repeated reading: the same text read up to three times, with feedback each time
 
-type Phase = "loading" | "failed" | "intro" | "reading" | "feedback" | "questions";
+type Phase = "loading" | "locked" | "failed" | "intro" | "reading" | "feedback" | "between" | "questions";
 
 /** One sentence per scored reading; /score takes up to 300 characters. */
 function sentences(story: string): string[] {
@@ -19,23 +21,59 @@ function sentences(story: string): string[] {
     .filter(Boolean);
 }
 
+interface Reading {
+  results: api.Attempt[];
+  seconds: number;
+}
+
+/** Share of sounds read right, over the sentences actually read. */
+function soundShare(results: api.Attempt[]): number | null {
+  const read = results.filter((r) => r.error_type !== "no_response");
+  return read.length ? read.reduce((sum, r) => sum + r.phoneme_accuracy, 0) / read.length : null;
+}
+
+function ReadingsTable({ readings }: { readings: Reading[] }) {
+  return (
+    <div className="card">
+      {readings.map((r, i) => {
+        const share = soundShare(r.results);
+        return (
+          <div key={i} className="reading-row">
+            <span>القراءة {i + 1}</span>
+            <span>{share === null ? "—" : `${Math.round(share * 100)}٪ أصوات صحيحة`}</span>
+            <span>{Math.round(r.seconds)} ث</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function StoryRecall() {
   const player = usePlayer();
   const scorer = useScorer(GAME);
   const [phase, setPhase] = useState<Phase>("loading");
+  const [status, setStatus] = useState<{ attempts: number; needed: number } | null>(null);
   const [story, setStory] = useState<api.Story | null>(null);
   const [error, setError] = useState("");
   const [index, setIndex] = useState(0);
-  const [results, setResults] = useState<api.ScoreResult[]>([]);
+  const [readings, setReadings] = useState<Reading[]>([]);
+  const [current, setCurrent] = useState<api.Attempt[]>([]);
   const [revealed, setRevealed] = useState<Set<number>>(new Set());
   const shownAt = useRef(0);
+  const readingStarted = useRef(0);
 
   const load = useCallback(async () => {
     setPhase("loading");
     try {
+      const s = await api.storyStatus(player.player_id);
+      if (!s.unlocked) {
+        setStatus(s);
+        setPhase("locked");
+        return;
+      }
       setStory(await api.story(player.player_id));
-      setIndex(0);
-      setResults([]);
+      setReadings([]);
       setRevealed(new Set());
       setPhase("intro");
     } catch (e) {
@@ -53,7 +91,26 @@ export default function StoryRecall() {
     void load();
   }, [load]);
 
-  if (phase === "loading") return <p className="center-note">نكتب لك قصة…</p>;
+  if (phase === "loading") return <p className="center-note">نكتب لك قصة من كلماتك…</p>;
+  if (phase === "locked" && status) {
+    const left = status.needed - status.attempts;
+    return (
+      <>
+        <h1>{TITLE}</h1>
+        <p className="lead">
+          القصة تُكتب لك من الحروف والكلمات التي تتدرّب عليها. العب قليلًا أولًا حتى نعرفها.
+        </p>
+        <div className="bar" role="img" aria-label={`${status.attempts} من ${status.needed}`}>
+          <span style={{ width: `${(status.attempts / status.needed) * 100}%` }} />
+        </div>
+        <p className="spaced">
+          بقي {left === 1 ? "كلمة واحدة" : left === 2 ? "كلمتان" : `${left} ${left <= 10 ? "كلمات" : "كلمة"}`} في
+          الألعاب الأخرى لتُفتح قصتك.
+        </p>
+        <BackLink />
+      </>
+    );
+  }
   if (phase === "failed" || !story) {
     return (
       <>
@@ -73,7 +130,8 @@ export default function StoryRecall() {
 
   const lines = sentences(story.story);
   const line = lines[index];
-  const last = results[results.length - 1];
+  const last = current[current.length - 1];
+  const round = readings.length + 1;
 
   function read(at: number) {
     setIndex(at);
@@ -81,10 +139,22 @@ export default function StoryRecall() {
     setPhase("reading");
   }
 
+  function startReading() {
+    setCurrent([]);
+    readingStarted.current = Date.now();
+    read(0);
+  }
+
+  function endReading() {
+    const done = [...readings, { results: current, seconds: (Date.now() - readingStarted.current) / 1000 }];
+    setReadings(done);
+    setPhase(done.length >= READINGS ? "questions" : "between");
+  }
+
   async function submit(answer: SpokenAnswer) {
     const result = await scorer.check(line, answer, shownAt.current);
     if (result) {
-      setResults((done) => [...done, result]);
+      setCurrent((done) => [...done, { ...result, target: line }]);
       setPhase("feedback");
     }
   }
@@ -93,22 +163,42 @@ export default function StoryRecall() {
     return (
       <>
         <h1>{TITLE}</h1>
-        <p className="lead">قصة كُتبت لك. اقرأها جملة جملة بصوت عالٍ، ثم أجب عن الأسئلة.</p>
+        <p className="lead">
+          قصة كُتبت لك من الحروف والكلمات التي تتدرّب عليها. ستقرؤها حتى {READINGS} مرات، جملة جملة، وفي كل مرة تصبح
+          أسهل.
+        </p>
         <div className="card story-text">{story.story}</div>
-        <button className="primary" onClick={() => read(0)} autoFocus>
+        <button className="primary" onClick={startReading} autoFocus>
           ابدأ القراءة
         </button>
       </>
     );
   }
 
+  if (phase === "between") {
+    return (
+      <>
+        <h1>أحسنت!</h1>
+        <p className="lead">القراءة مرة أخرى تجعلها أسرع وأدق.</p>
+        <ReadingsTable readings={readings} />
+        <CoachNote kind="round" attempts={readings[readings.length - 1].results} />
+        <div className="row">
+          <button className="primary" onClick={startReading} autoFocus>
+            اقرأها مرة أخرى ({round} من {READINGS})
+          </button>
+          <button className="secondary" onClick={() => setPhase("questions")}>
+            إلى الأسئلة
+          </button>
+        </div>
+      </>
+    );
+  }
+
   if (phase === "questions") {
-    const answered = results.filter((r) => r.error_type !== "no_response");
-    const sounds = answered.length ? answered.reduce((sum, r) => sum + r.phoneme_accuracy, 0) / answered.length : 0;
     return (
       <>
         <h1>الأسئلة</h1>
-        {answered.length > 0 && <p className="level">قرأت {Math.round(sounds * 100)}٪ من الأصوات صحيحة</p>}
+        <ReadingsTable readings={readings} />
         <div className="card story-text">{story.story}</div>
         {story.questions.map((q, i) => (
           <div key={i} className="card question">
@@ -134,7 +224,7 @@ export default function StoryRecall() {
 
   const count = (
     <p className="count">
-      الجملة {index + 1} من {lines.length}
+      القراءة {round} من {READINGS} · الجملة {index + 1} من {lines.length}
     </p>
   );
 
@@ -150,8 +240,9 @@ export default function StoryRecall() {
           </p>
           {!last.correct && <p>{FEEDBACK[last.error_type]}</p>}
         </div>
-        <button className="primary" onClick={() => (isLast ? setPhase("questions") : read(index + 1))} autoFocus>
-          {isLast ? "إلى الأسئلة" : "الجملة التالية"}
+        {!last.correct && last.error_type !== "no_response" && <CoachNote kind="word" attempts={[last]} />}
+        <button className="primary" onClick={() => (isLast ? endReading() : read(index + 1))} autoFocus>
+          {isLast ? "أنهِ القراءة" : "الجملة التالية"}
         </button>
       </>
     );

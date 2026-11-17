@@ -1,3 +1,4 @@
+import json
 import os
 import threading
 import time
@@ -7,9 +8,9 @@ from fastapi import Depends, FastAPI, File, Form, HTTPException, Path, Query, Up
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from . import brain, db, g2p, mock, scoring, speech
+from . import brain, db, g2p, mock, rhythm, scoring, speech
 from .schemas import (
-    GuestStart, Login, LoginResponse, NextExerciseRequest, NextExerciseResponse, Player, ProgressResponse, Register, ScoreResponse,
+    CoachRequest, CoachResponse, GuestStart, RhythmResponse, StoryStatus, Login, LoginResponse, NextExerciseRequest, NextExerciseResponse, Player, ProgressResponse, Register, ScoreResponse,
     StoryRequest, StoryResponse,
 )
 
@@ -103,6 +104,85 @@ def score(
     return result
 
 
+@app.post("/score-rhythm", response_model=RhythmResponse)
+def score_rhythm(
+    targets: str = Form(..., max_length=2000),  # JSON list of the words, in the order they were shown
+    slot_ms: int = Form(..., ge=400, le=5000),  # time between words
+    first_word_ms: int = Form(..., ge=0, le=20000),  # when the first word appeared, from the start of the recording
+    audio: UploadFile | None = File(None),
+    heard_text: str | None = Form(None, max_length=600),  # debug mode: the whole run typed, words separated by spaces
+    game: str = Form("rhythmic_reading", pattern=r"^[a-z_]{1,32}$"),
+    player: str | None = Depends(optional_player),
+):
+    try:
+        texts = json.loads(targets)
+        assert isinstance(texts, list) and 1 <= len(texts) <= 8 and all(isinstance(w, str) and 0 < len(w) <= 40 for w in texts)
+    except (ValueError, AssertionError):
+        raise HTTPException(422, "targets must be a JSON list of 1 to 8 words")
+    if MOCK:
+        return mock.score_rhythm(texts, slot_ms)
+    target_ph = [list(g2p.phonemes(w)) for w in texts]
+    if not all(target_ph):
+        raise HTTPException(422, "every target needs sounds to say")
+    starts = None
+    if audio is None:  # typed, or nothing at all (the reader stayed silent)
+        heard = list(g2p.phonemes(heard_text or ""))
+    else:
+        data = audio.file.read(MAX_AUDIO_BYTES + 1)
+        if len(data) > MAX_AUDIO_BYTES:
+            raise HTTPException(413, "Audio too large")
+        try:
+            timed = speech.recognize_timed(data, arabic=all(scoring.is_arabic(w) for w in texts))
+        except speech.SpeechUnavailable as e:
+            raise HTTPException(503, str(e))
+        except speech.BadAudio as e:
+            raise HTTPException(422, str(e))
+        heard, starts = [p for p, _ in timed], [ms for _, ms in timed]
+    result = rhythm.score_run(texts, target_ph, heard, starts, slot_ms, first_word_ms)
+    if player:
+        for word in result["words"]:
+            db.save_attempt(player, game, word["target"], word)
+    return result
+
+
+@app.post("/timing-test")
+def timing_test(
+    audio: UploadFile = File(...),
+    # Optional, for the real-word check: the words shown, and when, as in /score-rhythm.
+    targets: str | None = Form(None, max_length=2000),
+    slot_ms: int = Form(2000, ge=400, le=5000),
+    first_word_ms: int = Form(0, ge=0, le=20000),
+):
+    """Mic check, outside the games: every sound the model heard and when it started, written back as Arabic.
+    With targets, also each word's result and timing. Nothing is saved."""
+    texts = None
+    if targets is not None:
+        try:
+            texts = json.loads(targets)
+            assert isinstance(texts, list) and 1 <= len(texts) <= 8 and all(isinstance(w, str) and 0 < len(w) <= 40 for w in texts)
+        except (ValueError, AssertionError):
+            raise HTTPException(422, "targets must be a JSON list of 1 to 8 words")
+    if MOCK:
+        raise HTTPException(503, "the timing test needs the real speech model")
+    data = audio.file.read(MAX_AUDIO_BYTES + 1)
+    if len(data) > MAX_AUDIO_BYTES:
+        raise HTTPException(413, "Audio too large")
+    try:
+        timed = speech.recognize_timed(data)
+    except speech.SpeechUnavailable as e:
+        raise HTTPException(503, str(e))
+    except speech.BadAudio as e:
+        raise HTTPException(422, str(e))
+    heard = [p for p, _ in timed]
+    out = {"sounds": [{"phoneme": p, "ms": ms} for p, ms in timed], "heard_text": g2p.spell(heard)}
+    if texts:
+        result = rhythm.score_run(texts, [list(g2p.phonemes(w)) for w in texts], heard, [ms for _, ms in timed],
+                                  slot_ms, first_word_ms)
+        out["words"] = [{**w, "heard_text": g2p.spell(w["heard_phonemes"])} for w in result["words"]]
+        out["steadiness_ms"] = result["steadiness_ms"]
+    return out
+
+
 @app.post("/next-exercise", response_model=NextExerciseResponse)
 def next_exercise(req: NextExerciseRequest, player: str = Depends(logged_in)):
     own_data(player, req.player_id)
@@ -121,8 +201,29 @@ def story(req: StoryRequest, player: str = Depends(logged_in)):
         return mock.story(req.weak_sounds, req.interests)
     try:
         return brain.story(req.player_id, req.weak_sounds, req.interests)
+    except brain.StoryLocked as e:
+        raise HTTPException(409, str(e))
     except brain.LLMUnavailable as e:
         raise HTTPException(503, f"Story service unavailable: {e}")
+
+
+@app.get("/story/status/{player_id}", response_model=StoryStatus)
+def story_status(player_id: str = Path(..., min_length=1, max_length=64), player: str = Depends(logged_in)):
+    own_data(player, player_id)
+    if MOCK:
+        return {"unlocked": True, "attempts": brain.STORY_UNLOCK, "needed": brain.STORY_UNLOCK}
+    return brain.story_status(player_id)
+
+
+@app.post("/coach", response_model=CoachResponse)
+def coach(req: CoachRequest, player: str = Depends(logged_in)):
+    own_data(player, req.player_id)
+    if MOCK:
+        return mock.coach(req.kind)
+    try:
+        return {"text": brain.coach(req.player_id, req.kind, [a.model_dump() for a in req.attempts])}
+    except brain.LLMUnavailable as e:
+        raise HTTPException(503, f"Coach unavailable: {e}")
 
 
 @app.get("/progress/{player_id}", response_model=ProgressResponse)

@@ -4,6 +4,7 @@ import { displayName, useSession } from "./session";
 const ITEMS = [
   { to: "/games/word-flash", title: "الكلمة الخاطفة", text: "اقرأ الكلمة قبل أن تختفي." },
   { to: "/games/sound-surgery", title: "جراحة الأصوات", text: "احذف صوتًا من الكلمة أو بدّله." },
+  { to: "/games/rhythmic-reading", title: "القراءة على الإيقاع", text: "اقرأ الكلمات مع الإيقاع دون توقف." },
   { to: "/games/story-recall", title: "قصتي", text: "اقرأ قصة كُتبت لك." },
   { to: "/progress", title: "تقدّمي", text: "شاهد كيف تتحسّن." },
 ];

@@ -33,6 +33,11 @@ def _diffs(target: list[str], heard: list[str]):
     return [op for op in SequenceMatcher(a=target, b=heard, autojunk=False).get_opcodes() if op[0] != "equal"]
 
 
+def changes(target: list[str], heard: list[str]) -> list[tuple[str, list[str], list[str]]]:
+    """[(tag, target part, heard part)] for every difference: tag is replace, delete or insert."""
+    return [(tag, target[i1:i2], heard[j1:j2]) for tag, i1, i2, j1, j2 in _diffs(target, heard)]
+
+
 def phoneme_accuracy(target: list[str], heard: list[str]) -> float:
     if not target and not heard:
         return 1.0

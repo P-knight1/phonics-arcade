@@ -39,8 +39,12 @@ Shapes live in [backend/app/schemas.py](../backend/app/schemas.py); the frontend
 | `POST /guest` | Play without an account; data deleted on `/logout` or after 24 h |
 | `GET /me`, `POST /logout` | Profile; end the login (logins last 30 days) |
 | `POST /score` | Score one answer (below) |
+| `POST /score-rhythm` | One recording of a Rhythmic Reading run → a result and a timing per word (section 3) |
+| `POST /timing-test` | Mic check (page `/mic-test`, not in the menu): every sound heard, its start time and the sounds written back as Arabic; with words, each word's result and timing; nothing saved |
 | `POST /next-exercise` | `{player_id, game, history}` → `{game, level, items, display_ms, reason}` |
+| `GET /story/status/{player_id}` | `{unlocked, attempts, needed}`: stories open after 20 word-game attempts |
 | `POST /story` | `{player_id, weak_sounds?, interests?}` → `{story, questions: [{q, answer}]}` |
+| `POST /coach` | `{player_id, kind: "word" \| "round", attempts}` → `{text}`: the reading coach (section 5) |
 | `GET /progress/{player_id}?game=` | One entry per day: word accuracy, phoneme accuracy, average response time, error counts |
 | `GET /health` | `{ok, mock}` |
 
@@ -103,6 +107,16 @@ The two sequences are aligned with `difflib.SequenceMatcher`; the most specific 
 `phoneme_accuracy` is matched phonemes over the longer sequence. English targets still work (espeak-ng `en-gb`,
 plus `letter_reversal` for b/d and was/saw); they are a leftover from before the switch to Arabic.
 
+### Rhythmic Reading
+
+One recording covers the whole run: a 4-beat count-in, then one word every two beats (the word shows on the first
+beat). `/score-rhythm` takes the words, the slot length and when the first word appeared. `speech.recognize_timed`
+returns each phoneme with the time it started (CTC frames are 20 ms). `rhythm.py` aligns the whole run against all
+the words at once and gives each heard sound to a word, so a missed word doesn't shift the others and an extra final
+vowel stays with its word. Each word is then scored like `/score`, plus `offset_ms` (from the word appearing to the
+reader starting it), `on_time` (started before the next word appeared), and `steadiness_ms` for the run (the spread
+of the offsets: lower is steadier). Every word is saved as its own attempt. Typed answers give no timing.
+
 ## 4. Adaptive practice (`brain.py`)
 
 - **Mastery per sound:** Bayesian Knowledge Tracing (Corbett & Anderson 1995), replayed over the player's saved
@@ -114,7 +128,7 @@ plus `letter_reversal` for b/d and was/saw); they are a leftover from before the
 
 ## 5. Generated stories
 
-`/story` asks an LLM for a short story with questions, using the player's weak letters and interests. Any
+`/story` asks an LLM for a short story with questions, built from the player's weakest letters (BKT), the real words they misread lately in Word Flash and Rhythmic Reading, and their interests. Stories unlock after 20 word-game attempts (`GET /story/status/{player_id}`; `/story` returns `409` before that), so there is enough data to target. The reader reads the same story up to three times, sentence by sentence, and sees sound accuracy and time for each reading (repeated reading), then the questions. Any
 OpenAI-compatible endpoint works (`VLLM_BASE_URL`, `VLLM_API_KEY`, `VLLM_MODEL` in `.env`; the names are
 historical). The prompt is [content/prompts/story.txt](../content/prompts/story.txt).
 
@@ -123,6 +137,15 @@ historical). The prompt is [content/prompts/story.txt](../content/prompts/story.
 - A story is read aloud and scored, so it must be vowelized: if fewer than 90% of its letters carry a mark, the
   backend asks once more, then returns `503`.
 - To read a story, the frontend sends it to `/score` one sentence at a time.
+
+### Reading coach
+
+`/coach` asks the same LLM to explain a mistake (`word`) or sum up a round (`round`) in one to three kind
+sentences. The LLM never hears audio and never decides right or wrong: the backend rewrites each scored attempt as
+letters (`حَبْلْ: قُرئ ح كأنه ج`), adds the player's weak letters, and fills
+[content/prompts/coach_word.txt](../content/prompts/coach_word.txt) or `coach_round.txt`. A reply must be Arabic,
+short (300 or 600 characters) and free of clinical words, or the request returns `503`. The frontend shows its
+fixed feedback first and adds the coach's note when it arrives, so a slow or missing LLM changes nothing.
 
 ## 6. Speech model (`speech.py`)
 
@@ -153,7 +176,8 @@ symbols in `SYMBOLS`; `ml/train.py` guarantees that.
 
 - Sound Surgery items store prompt and answer as `"prompt|answer"`; `/score` gets the answer as `target`, and the
   weak-sound targeting looks at the answer only. `backend/tests/test_content.py` checks every content file.
-- Game names stored with attempts: `word_flash`, `sound_surgery`, `story_recall`.
+- Game names stored with attempts: `word_flash`, `sound_surgery`, `rhythmic_reading`, `story_recall`.
+- `content/rhythmic_reading.json` uses `display_ms` as the slot per word: 3000 ms at level 1 down to 1600 ms.
 
 ## 8. Known limits
 

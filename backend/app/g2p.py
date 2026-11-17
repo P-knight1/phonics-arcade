@@ -8,7 +8,7 @@ from phonemizer.backend import EspeakBackend
 from phonemizer.backend.espeak.wrapper import EspeakWrapper
 from phonemizer.separator import Separator
 
-from .arabic_phonemes import arabic_phonemes
+from .arabic_phonemes import DAMMA, FATHA, KASRA, LETTERS, SHADDA, arabic_phonemes, fold
 from .scoring import is_arabic, normalize
 
 # Bundled espeak-ng library: no system install on Windows, macOS or Linux.
@@ -29,3 +29,24 @@ def phonemes(text: str) -> tuple[str, ...]:
     with _lock:
         out = _backend.phonemize([text], separator=_SEPARATOR, strip=True)[0]
     return tuple(normalize(out.split()))
+
+
+_LETTER_FOR = {sym: ch for ch, sym in LETTERS.items() if ch not in "أإؤئ"}
+_MARK_FOR = {"a": FATHA, "u": DAMMA, "i": KASRA}
+_MADD = {"a": "ا", "u": "و", "i": "ي"}
+
+
+def spell(phonemes: list[str]) -> str:
+    """Arabic phonemes back to vowelized letters, so a person can read what the model heard: b aa b -> 'بَاب'.
+    Rough on purpose (no hamza seats, sun letters or pause rules): it shows sounds, not correct spelling."""
+    out = []
+    for p in fold(phonemes):
+        if p in _MARK_FOR:
+            out.append(_MARK_FOR[p])
+        elif len(p) == 2 and p[0] == p[1] and p[0] in _MARK_FOR:
+            out.append(_MARK_FOR[p[0]] + _MADD[p[0]])
+        elif len(p) == 2 and p[0] == p[1] and p[0] in _LETTER_FOR:
+            out.append(_LETTER_FOR[p[0]] + SHADDA)
+        else:
+            out.append(_LETTER_FOR.get(p, p))
+    return "".join(out)

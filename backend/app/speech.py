@@ -8,6 +8,9 @@ Interface main.py relies on (keep it):
         heard_text      empty for now: main.py shows the target when the answer is right.
         Silence gives ("", []). Raises SpeechUnavailable without the speech packages, BadAudio for unreadable audio.
 
+    recognize_timed(audio: bytes, arabic: bool = True) -> list[tuple[str, int]]
+        the same phonemes with the time each one starts, in ms from the start of the recording (Rhythmic Reading).
+
 Each model outputs the symbols app/g2p.py gives that language's targets, so they compare:
 Arabic: our fine-tuned model (ml/, Iqra'Eval symbols). English: the espeak IPA model it was fine-tuned from.
 """
@@ -74,12 +77,31 @@ def warm_up() -> None:
         pass
 
 
+def _frames(samples, arabic: bool):
+    """Best token id per 20 ms frame, and the processor that names them."""
+    torch, processor, model, device = _load(ARABIC_MODEL if arabic else ENGLISH_MODEL)
+    inputs = processor(samples, sampling_rate=RATE, return_tensors="pt")
+    with _lock, torch.inference_mode():
+        return model(inputs.input_values.to(device)).logits.argmax(-1), processor
+
+
 def recognize(audio: bytes, content_type: str, arabic: bool = False) -> tuple[str, list[str]]:
     samples = _decode(audio)
     if len(samples) < MIN_SECONDS * RATE:
         return "", []
-    torch, processor, model, device = _load(ARABIC_MODEL if arabic else ENGLISH_MODEL)
-    inputs = processor(samples, sampling_rate=RATE, return_tensors="pt")
-    with _lock, torch.inference_mode():
-        ids = model(inputs.input_values.to(device)).logits.argmax(-1)
+    ids, processor = _frames(samples, arabic)
     return "", processor.batch_decode(ids)[0].split()
+
+
+def recognize_timed(audio: bytes, arabic: bool = True) -> list[tuple[str, int]]:
+    """[(phoneme, start_ms)] from the start of the recording: CTC's greedy decode, keeping where each run starts."""
+    samples = _decode(audio)
+    if len(samples) < MIN_SECONDS * RATE:
+        return []
+    ids, processor = _frames(samples, arabic)
+    ids = ids[0].tolist()
+    tokenizer = processor.tokenizer
+    skip = {tokenizer.pad_token_id, *tokenizer.all_special_ids, tokenizer.convert_tokens_to_ids("|")}
+    ms_per_frame = len(samples) / RATE * 1000 / len(ids)
+    return [(tokenizer.convert_ids_to_tokens(i), round(f * ms_per_frame))
+            for f, i in enumerate(ids) if i not in skip and (f == 0 or ids[f - 1] != i)]

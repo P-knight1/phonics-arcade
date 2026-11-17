@@ -8,6 +8,7 @@ const GAMES = [
   { id: "", name: "كل الألعاب" },
   { id: "word_flash", name: "الكلمة الخاطفة" },
   { id: "sound_surgery", name: "جراحة الأصوات" },
+  { id: "rhythmic_reading", name: "القراءة على الإيقاع" },
   { id: "story_recall", name: "قصتي" },
 ];
 

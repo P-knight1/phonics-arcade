@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type * as api from "../../api";
 import AnswerControls from "../../shell/AnswerControls";
+import CoachNote from "../../shell/CoachNote";
 import { FEEDBACK } from "../../shell/feedback";
 import { RoundFailed, RoundSummary, useRound } from "../../shell/round";
 import { useScorer, type SpokenAnswer } from "../../shell/useScorer";
@@ -15,7 +16,7 @@ export default function WordFlash() {
   const scorer = useScorer(GAME);
   const [phase, setPhase] = useState<Phase>("intro");
   const [index, setIndex] = useState(0);
-  const [results, setResults] = useState<api.ScoreResult[]>([]);
+  const [results, setResults] = useState<api.Attempt[]>([]);
   const shownAt = useRef(0);
   const exercise = round.exercise;
 
@@ -50,7 +51,7 @@ export default function WordFlash() {
   async function submit(answer: SpokenAnswer) {
     const result = await scorer.check(word, answer, shownAt.current);
     if (result) {
-      setResults((done) => [...done, result]);
+      setResults((done) => [...done, { ...result, target: word }]);
       setPhase("feedback");
     } else {
       setPhase("answering");
@@ -93,6 +94,7 @@ export default function WordFlash() {
           {!last.correct && last.heard && <p>سمعنا: {last.heard}</p>}
           {!last.correct && <p>{FEEDBACK[last.error_type]}</p>}
         </div>
+        {!last.correct && last.error_type !== "no_response" && <CoachNote kind="word" attempts={[last]} />}
         <button className="primary" onClick={() => (isLast ? setPhase("summary") : showWord(index + 1))} autoFocus>
           {isLast ? "أنهِ الجولة" : "الكلمة التالية"}
         </button>

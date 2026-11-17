@@ -16,7 +16,7 @@ from pydantic import ValidationError
 from . import db, g2p
 from .arabic_phonemes import LETTERS, SHADDA
 from .schemas import StoryResponse
-from .scoring import missed_phonemes, single
+from .scoring import changes, missed_phonemes, single
 
 CONTENT_DIR = Path(__file__).resolve().parents[2] / "content"  # repo root locally, /content in Docker
 ROUND_SIZE = 5
@@ -34,6 +34,7 @@ def letter(p: str) -> str:
 MIN_RESULTS_TO_MOVE = 3  # don't change level on one lucky or unlucky word
 LEVEL_UP, LEVEL_DOWN = 0.8, 0.5  # word accuracy of the round just played
 MIN_VOWELIZED = 0.9  # share of letters with a vowel mark a story needs (stories are read aloud and scored)
+STORY_UNLOCK = 20  # word-game attempts before stories open: enough to know which sounds and words to target
 
 STORY_SCHEMA = {
     "type": "object",
@@ -57,6 +58,10 @@ class ContentMissing(Exception):
 
 
 class LLMUnavailable(Exception):
+    pass
+
+
+class StoryLocked(Exception):
     pass
 
 
@@ -134,7 +139,7 @@ def next_exercise(player_id: str, game: str, history: list[dict]) -> dict:
             "display_ms": spec["display_ms"], "reason": reason}
 
 
-def _complete(prompt: str) -> str:
+def _complete(prompt: str, schema: dict = STORY_SCHEMA) -> str:
     base_url, api_key, model = (os.getenv(k) for k in ("VLLM_BASE_URL", "VLLM_API_KEY", "VLLM_MODEL"))
     if not (base_url and model):
         raise LLMUnavailable("VLLM_BASE_URL / VLLM_MODEL are not set")
@@ -144,7 +149,7 @@ def _complete(prompt: str) -> str:
         try:
             # vLLM structured output: the model can only produce JSON in this shape.
             resp = client.chat.completions.create(
-                **request, response_format={"type": "json_schema", "json_schema": {"name": "story", "schema": STORY_SCHEMA}})
+                **request, response_format={"type": "json_schema", "json_schema": {"name": "reply", "schema": schema}})
         except BadRequestError:  # some hosted dev APIs lack schema output; the prompt asks for JSON and story() checks it
             resp = client.chat.completions.create(**request)
     except OpenAIError as e:
@@ -167,17 +172,68 @@ def _parse_story(text: str) -> dict:
         raise LLMUnavailable("LLM returned a story in the wrong shape") from e
 
 
+def story_status(player_id: str) -> dict:
+    done = db.practice_count(player_id)
+    return {"unlocked": done >= STORY_UNLOCK, "attempts": done, "needed": STORY_UNLOCK}
+
+
 def story(player_id: str, weak: list[str], interests: list[str]) -> dict:
+    if not story_status(player_id)["unlocked"]:
+        raise StoryLocked(f"stories open after {STORY_UNLOCK} attempts in the word games")
     if not weak:  # frontend doesn't know the weak sounds; the recorded attempts do
         weak = weakest(player_id)
     if not interests and (player := db.get_player(player_id)):
         interests = player["interests"]
     template = Template((CONTENT_DIR / "prompts" / "story.txt").read_text(encoding="utf-8"))
     prompt = template.safe_substitute(weak_sounds="، ".join(letter(p) for p in weak) or "أي حروف",
-                                      interests="، ".join(interests) or "الحيوانات")
+                                      interests="، ".join(interests) or "الحيوانات",
+                                      missed_words="، ".join(db.recent_mistakes(player_id)) or "لا يوجد")
     for _ in range(2):  # a story without its vowel marks can't be read by a beginner: ask once more
         result = _parse_story(_complete(prompt))
         text = result["story"] + " ".join(q["q"] + " " + q["answer"] for q in result["questions"])
         if vowelized_share(text) >= MIN_VOWELIZED:
             return result
     raise LLMUnavailable("LLM story was not fully vowelized")
+
+
+# The reading coach: an LLM explains a mistake the phoneme model found, in words a reader understands. It never
+# judges right or wrong (scoring does) and never hears audio: it gets the target text and the two phoneme
+# sequences, rewritten as letters.
+COACH_SCHEMA = {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]}
+COACH_LIMIT = {"word": 300, "round": 600}  # characters
+ERROR_NAMES = {"none": "لا خطأ", "letter_reversal": "حرفان متبادلان", "missing_sound": "صوت ناقص",
+               "added_sound": "صوت زائد", "substitution": "صوت مختلف", "no_response": "لم يقرأ",
+               "dot_confusion": "حرفان يختلفان بالنقاط", "vowel_error": "حركة مختلفة",
+               "vowel_length": "مدّ أو قصر", "letter_position": "ترتيب الحروف"}
+BANNED = ("تشخيص", "مرض", "اضطراب", "علاج", "diagnos")  # no clinical language reaches the reader
+
+
+def what_happened(a: dict) -> str:
+    """One attempt in Arabic: 'قُرئ ح كأنه ج' rather than phoneme symbols."""
+    if a["error_type"] == "no_response":
+        return "لم يقرأ شيئًا"
+    if a["correct"]:
+        return "قرأها صحيحة"
+    t, h = a["target_phonemes"], a["heard_phonemes"]
+    swapped = [k for k in range(len(t)) if len(t) == len(h) and t[k] != h[k]]
+    if a["error_type"] == "letter_position" and len(swapped) == 2:  # the diff alone reads as add + drop
+        return f"تبادل {letter(t[swapped[0]])} و{letter(t[swapped[1]])} مكانيهما"
+    said = {"replace": "قُرئ {t} كأنه {h}", "delete": "سقط {t}", "insert": "أُضيف {h}"}
+    return "، ".join(said[tag].format(t=" ".join(map(letter, t)), h=" ".join(map(letter, h)))
+                     for tag, t, h in changes(a["target_phonemes"], a["heard_phonemes"]))
+
+
+def coach(player_id: str, kind: str, attempts: list[dict]) -> str:
+    lines = "\n".join(f"- {a['target'].split('|')[-1]}: {what_happened(a)} ({ERROR_NAMES[a['error_type']]})"
+                      for a in attempts)
+    template = Template((CONTENT_DIR / "prompts" / f"coach_{kind}.txt").read_text(encoding="utf-8"))
+    prompt = template.safe_substitute(attempts=lines,
+                                      weak_sounds="، ".join(letter(p) for p in weakest(player_id)) or "لا شيء بعد")
+    raw = _complete(prompt, COACH_SCHEMA)
+    try:
+        text = json.loads(raw[raw.find("{"): raw.rfind("}") + 1])["text"].strip()
+    except (ValueError, KeyError, TypeError) as e:
+        raise LLMUnavailable("LLM returned coach text in the wrong shape") from e
+    if not text or len(text) > COACH_LIMIT[kind] or not g2p.is_arabic(text) or any(w in text.lower() for w in BANNED):
+        raise LLMUnavailable("LLM coach text failed the checks")
+    return text

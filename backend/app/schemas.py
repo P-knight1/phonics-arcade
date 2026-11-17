@@ -20,6 +20,17 @@ class ScoreResponse(BaseModel):
     error_type: ErrorType
 
 
+class RhythmWord(ScoreResponse):
+    target: str
+    offset_ms: int | None  # from the moment the word appeared until the reader started it; null for typed answers
+    on_time: bool | None  # started before the next word appeared
+
+
+class RhythmResponse(BaseModel):
+    words: list[RhythmWord]
+    steadiness_ms: int | None  # spread of the delays: lower is a steadier rhythm
+
+
 class NextExerciseRequest(BaseModel):
     player_id: PlayerId
     game: Game
@@ -40,6 +51,12 @@ class StoryRequest(BaseModel):
     interests: list[Interest] = Field(default=[], max_length=5)
 
 
+class StoryStatus(BaseModel):
+    unlocked: bool
+    attempts: int  # word-game attempts so far
+    needed: int
+
+
 class Question(BaseModel):
     q: str
     answer: str
@@ -48,6 +65,25 @@ class Question(BaseModel):
 class StoryResponse(BaseModel):
     story: str
     questions: list[Question]
+
+
+class CoachAttempt(BaseModel):
+    target: Annotated[str, Field(min_length=1, max_length=300)]
+    target_phonemes: list[Annotated[str, Field(max_length=8)]] = Field(max_length=300)
+    heard_phonemes: list[Annotated[str, Field(max_length=8)]] = Field(max_length=300)
+    correct: bool
+    error_type: ErrorType
+
+
+class CoachRequest(BaseModel):
+    """kind "word": explain one attempt. kind "round": sum up a round's attempts."""
+    player_id: PlayerId
+    kind: Literal["word", "round"]
+    attempts: list[CoachAttempt] = Field(min_length=1, max_length=20)
+
+
+class CoachResponse(BaseModel):
+    text: str
 
 
 class Session(BaseModel):

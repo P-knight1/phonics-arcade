@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import * as api from "../api";
+import CoachNote from "./CoachNote";
 import { usePlayer } from "./session";
 
 /** One round of a word-list game: the server picks the level and items from the last round's results. */
@@ -59,7 +60,7 @@ export function RoundFailed({ title, error, retry }: { title: string; error: str
   );
 }
 
-export function RoundSummary({ results, next }: { results: api.ScoreResult[]; next(): void }) {
+export function RoundSummary({ results, next }: { results: api.Attempt[]; next(): void }) {
   const right = results.filter((r) => r.correct).length;
   return (
     <>
@@ -67,6 +68,7 @@ export function RoundSummary({ results, next }: { results: api.ScoreResult[]; ne
       <p className="level">
         {right} من {results.length} صحيحة
       </p>
+      <CoachNote kind="round" attempts={results} />
       <div className="row">
         <button className="primary" onClick={next} autoFocus>
           الجولة التالية

@@ -397,6 +397,111 @@ label .hint {
   margin-bottom: 0;
 }
 
+/* Rhythmic Reading */
+.pulse {
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  background: var(--border);
+  margin-bottom: 0.5rem;
+}
+
+.pulse.beat {
+  animation: beat 0.35s ease-out;
+}
+
+@keyframes beat {
+  from {
+    background: var(--accent);
+    transform: scale(1.8);
+  }
+  to {
+    background: var(--border);
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse.beat {
+    animation: none;
+    background: var(--accent);
+  }
+}
+
+label.check {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-weight: normal;
+}
+
+label.check input {
+  width: auto;
+  margin: 0;
+}
+
+.rhythm-row {
+  display: grid;
+  grid-template-columns: 7rem 1fr 6rem;
+  gap: 0.8rem;
+  align-items: center;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.rhythm-row:last-child {
+  border-bottom: none;
+}
+
+.rhythm-word {
+  font-family: var(--read-font);
+  font-size: 1.6rem;
+  font-weight: bold;
+}
+
+.rhythm-row.correct .rhythm-word {
+  color: var(--good);
+}
+
+.rhythm-row.wrong .rhythm-word {
+  color: var(--warn);
+}
+
+.rhythm-time {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.reading-row {
+  display: grid;
+  grid-template-columns: 6rem 1fr 4rem;
+  gap: 0.8rem;
+  padding: 0.3rem 0;
+}
+
+/* Coach */
+.coach {
+  margin: 0 0 1.2rem;
+  padding: 0.9rem 1.1rem;
+  background: var(--surface);
+  border-inline-start: 5px solid var(--accent);
+  border-radius: 10px;
+}
+
+.coach-label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: var(--accent);
+}
+
+.coach p {
+  margin: 0;
+  font-family: var(--read-font);
+  font-size: 1.3rem;
+  line-height: 2;
+}
+
 /* Progress */
 h2 {
   font-size: 1.25rem;
