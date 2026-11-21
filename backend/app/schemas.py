@@ -18,6 +18,7 @@ class ScoreResponse(BaseModel):
     phoneme_accuracy: float
     response_ms: int | None  # null when shown_at_ms was not sent
     error_type: ErrorType
+    unclear: bool = False  # the model can't tell if the word was right: ask for another reading, save nothing
 
 
 class RhythmWord(ScoreResponse):

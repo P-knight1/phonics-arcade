@@ -10,6 +10,9 @@ export default function Layout() {
     <>
       <header className="topbar">
         <Link to="/" className="brand">
+          <span className="brand-mark" aria-hidden="true">
+            ح
+          </span>
           صوت الحروف
         </Link>
         {DEBUG && <span className="badge">وضع التجربة</span>}

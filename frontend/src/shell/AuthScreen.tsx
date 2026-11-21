@@ -55,7 +55,12 @@ export default function AuthScreen() {
 
   return (
     <main className="auth">
-      <h1>صوت الحروف</h1>
+      <h1 className="brand">
+        <span className="brand-mark" aria-hidden="true">
+          ح
+        </span>
+        صوت الحروف
+      </h1>
       <p className="lead">ألعاب للتدرّب على القراءة بصوتك.</p>
 
       <div className="card">

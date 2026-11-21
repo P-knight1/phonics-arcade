@@ -86,6 +86,29 @@ copies identical). Consonants `b t ^ j H x d * r z s $ S D T Z E g f q k l m n h
 - Sun letters, hamzat al-wasl and long vowels follow normal reading rules: الشَّمْسُ → `< a $$ a m s`.
 - The last word is read in pause: كِتَابٌ → `k i t aa b`. Reading the final vowel or tanwin in full is also
   correct Arabic, so `scoring` accepts it too.
+- A word ending in two consonants (حَبْلْ) is often said with a short vowel slipped between them (حَبِل). That is
+  how the cluster is pronounced, not a misreading, so `scoring` accepts it.
+
+### Close calls: does the recording fit the word?
+
+The model gets about one sound in ten wrong, so a word of four or five sounds read perfectly would still be
+marked wrong roughly a third of the time if the transcript had to match exactly. For Arabic audio,
+`speech.recognize_fit` therefore also asks how well the recording fits the word the reader was asked to say: the
+CTC likelihood of the target against that of the model's own transcript (goodness of pronunciation, Witt and
+Young 2000). The difference, the gap, is in nats; 0 means the target is as likely as the transcript.
+
+| Gap | Verdict | Why |
+|---|---|---|
+| up to 3 | right | the transcript's difference is the model's slip |
+| 3 to 6 | "read it again" (`unclear`), nothing saved | slips and some real misreadings (mostly vowels) overlap here |
+| over 6 | the normal error type | a real misreading |
+
+The second reading of a word always gets a verdict (`second_try`), so a reader is never stuck. The thresholds come
+from 300 Iqra'Eval dev recordings with each label's true reading as the target, and the same label with one sound
+changed (dot twin, another short vowel, a dropped consonant) as a simulated misreading. At 3, 83% of right readings
+transcribed with a single slip passed and no misreading did. On 30 other dev recordings sent through `/score` as
+whole sentences, correct readings marked right rose from 8 to 17 (4 more were asked to read again) and none of the
+30 one-letter misreadings was accepted. The recordings are adults reading sentences; the pilot checks it on words.
 
 Check an item: `python -c "from app import g2p; print(g2p.phonemes('بَابْ'))"` from `backend/`
 (on Windows set `PYTHONIOENCODING=utf-8` first).

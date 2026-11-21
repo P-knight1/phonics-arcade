@@ -16,7 +16,8 @@ def test_score_heard_text(client):
     r = say(client, "dog", "bog")
     assert r.status_code == 200
     assert r.json() == {"heard": "bog", "target_phonemes": ["d", "ɒ", "g"], "heard_phonemes": ["b", "ɒ", "g"],
-                        "correct": False, "phoneme_accuracy": 0.67, "response_ms": None, "error_type": "letter_reversal"}
+                        "correct": False, "phoneme_accuracy": 0.67, "response_ms": None, "error_type": "letter_reversal",
+                        "unclear": False}
 
 
 def test_score_response_ms(client):
@@ -214,11 +215,7 @@ def test_score_arabic_heard_text(client):
 
 
 def test_score_arabic_audio_uses_the_arabic_model(client, monkeypatch):
-    def recognize(audio, ctype, arabic):
-        assert arabic
-        return "", ["k", "a", "t", "i", "b"]
-
-    monkeypatch.setattr(speech, "recognize", recognize)
+    monkeypatch.setattr(speech, "recognize_fit", lambda audio, target: (["k", "a", "t", "i", "b"], 12.0))
     r = client.post("/score", data={"target": "كَاتِب"}, files={"audio": ("a.webm", b"x", "audio/webm")}).json()
     assert (r["target_phonemes"], r["error_type"]) == (["k", "aa", "t", "i", "b"], "vowel_length")
 
@@ -244,3 +241,37 @@ def test_practice_follows_mastery_not_one_bad_round(client, levels, login):
     for _ in range(4):
         say(client, "dad", "dad", p)   # ...until it is mastered
     assert ask(client, [], p).json()["reason"] != "نتدرّب على: د"
+
+
+def test_wrong_arabic_answer_shows_what_was_heard_as_letters(client, monkeypatch):
+    monkeypatch.setattr(speech, "recognize_fit", lambda audio, target: (["j", "a", "b", "l"], 15.0))
+    r = client.post("/score", data={"target": "حَبْلْ"}, files={"audio": ("a.webm", b"x", "audio/webm")})
+    assert (r.json()["error_type"], r.json()["heard"]) == ("dot_confusion", "جَبل")
+
+
+def fit(client, monkeypatch, heard, gap, auth=None, **extra):
+    monkeypatch.setattr(speech, "recognize_fit", lambda audio, target: (heard, gap))
+    return client.post("/score", data={"target": "قَلَمْ", "game": "word_flash", **extra},
+                       files={"audio": ("a.webm", b"x", "audio/webm")}, headers=auth or {}).json()
+
+
+def test_word_that_fits_is_right_despite_a_transcript_slip(client, monkeypatch, login):
+    pid, auth = login(client)
+    r = fit(client, monkeypatch, ["q", "a", "l", "a", "n"], 1.2, auth)
+    assert (r["correct"], r["unclear"], r["heard"], r["heard_phonemes"]) == (True, False, "قَلَمْ", ["q", "a", "l", "a", "m"])
+    assert brain.weakest(pid) == []  # the slip doesn't count against م
+
+
+def test_borderline_reading_is_read_again_and_not_saved(client, monkeypatch, login):
+    pid, auth = login(client)
+    r = fit(client, monkeypatch, ["q", "a", "l", "a", "n"], 4.5, auth)
+    assert (r["correct"], r["unclear"]) == (False, True)
+    assert client.get(f"/progress/{pid}", headers=auth).json()["sessions"] == []
+    again = fit(client, monkeypatch, ["q", "a", "l", "a", "n"], 4.5, auth, second_try="true")
+    assert (again["correct"], again["unclear"], again["error_type"]) == (False, False, "substitution")
+    assert client.get(f"/progress/{pid}", headers=auth).json()["sessions"][0]["errors"] == {"substitution": 1}
+
+
+def test_clear_misreading_stays_wrong(client, monkeypatch):
+    r = fit(client, monkeypatch, ["k", "a", "l", "a", "m"], 14.0)
+    assert (r["correct"], r["unclear"]) == (False, False)

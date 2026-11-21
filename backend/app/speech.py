@@ -11,6 +11,10 @@ Interface main.py relies on (keep it):
     recognize_timed(audio: bytes, arabic: bool = True) -> list[tuple[str, int]]
         the same phonemes with the time each one starts, in ms from the start of the recording (Rhythmic Reading).
 
+    recognize_fit(audio: bytes, target: list[str]) -> tuple[list[str], float | None]
+        Arabic: the heard phonemes, and how much worse the target fits the recording than the model's own reading
+        (the "gap", in nats; 0 when they agree). scoring.py uses it so one shaky sound doesn't fail a word.
+
 Each model outputs the symbols app/g2p.py gives that language's targets, so they compare:
 Arabic: our fine-tuned model (ml/, Iqra'Eval symbols). English: the espeak IPA model it was fine-tuned from.
 """
@@ -77,12 +81,18 @@ def warm_up() -> None:
         pass
 
 
-def _frames(samples, arabic: bool):
-    """Best token id per 20 ms frame, and the processor that names them."""
+def _logits(samples, arabic: bool):
+    """Scores for every token per 20 ms frame, and the processor that names them."""
     torch, processor, model, device = _load(ARABIC_MODEL if arabic else ENGLISH_MODEL)
     inputs = processor(samples, sampling_rate=RATE, return_tensors="pt")
     with _lock, torch.inference_mode():
-        return model(inputs.input_values.to(device)).logits.argmax(-1), processor
+        return model(inputs.input_values.to(device)).logits, processor
+
+
+def _frames(samples, arabic: bool):
+    """Best token id per 20 ms frame, and the processor that names them."""
+    logits, processor = _logits(samples, arabic)
+    return logits.argmax(-1), processor
 
 
 def recognize(audio: bytes, content_type: str, arabic: bool = False) -> tuple[str, list[str]]:
@@ -105,3 +115,29 @@ def recognize_timed(audio: bytes, arabic: bool = True) -> list[tuple[str, int]]:
     ms_per_frame = len(samples) / RATE * 1000 / len(ids)
     return [(tokenizer.convert_ids_to_tokens(i), round(f * ms_per_frame))
             for f, i in enumerate(ids) if i not in skip and (f == 0 or ids[f - 1] != i)]
+
+
+def recognize_fit(audio: bytes, target: list[str]) -> tuple[list[str], float | None]:
+    """Goodness of pronunciation (Witt & Young 2000, here with CTC): compare how likely the recording is as the
+    target with how likely it is as the model's own reading. A word read right but transcribed with one slip fits
+    the target almost as well; a real misreading fits it much worse. None: a target sound the model doesn't know."""
+    samples = _decode(audio)
+    if len(samples) < MIN_SECONDS * RATE:
+        return [], None
+    torch, *_ = _load(ARABIC_MODEL)
+    logits, processor = _logits(samples, arabic=True)
+    log_probs = logits.float().log_softmax(-1)[0].cpu()
+    tokenizer = processor.tokenizer
+    blank, vocab = tokenizer.pad_token_id, tokenizer.get_vocab()
+    ids = log_probs.argmax(-1).tolist()
+    heard_ids = [i for f, i in enumerate(ids) if i != blank and (f == 0 or ids[f - 1] != i)]
+    heard = tokenizer.convert_ids_to_tokens(heard_ids)
+    if not heard_ids or any(p not in vocab for p in target):
+        return heard, None
+
+    def nll(seq):
+        return torch.nn.functional.ctc_loss(log_probs.unsqueeze(1), torch.tensor([seq]), [len(ids)], [len(seq)],
+                                            blank=blank, reduction="sum").item()
+
+    return heard, nll([vocab[p] for p in target]) - nll(heard_ids)
+

@@ -21,6 +21,8 @@ export interface ScoreResult {
   phoneme_accuracy: number;
   response_ms: number | null;
   error_type: ErrorType;
+  /** The model can't tell whether the word was right: ask for another reading (nothing was saved). */
+  unclear?: boolean;
 }
 
 /** A scored answer plus what the player was asked to say (the coach needs both). */
@@ -171,6 +173,8 @@ export interface Answer {
   audio?: Blob;
   /** Debug answer: scored instead of audio. Leave both out when the player said nothing. */
   heardText?: string;
+  /** The reading after an unclear one: the server then always gives a verdict. */
+  secondTry?: boolean;
 }
 
 export function score(answer: Answer): Promise<ScoreResult> {
@@ -179,6 +183,7 @@ export function score(answer: Answer): Promise<ScoreResult> {
   form.append("game", answer.game);
   if (answer.shownAtMs !== undefined)
     form.append("shown_at_ms", String(answer.shownAtMs));
+  if (answer.secondTry) form.append("second_try", "true");
   if (answer.audio) {
     // Safari records mp4, Chrome and Firefox record webm: the backend accepts both.
     const ext = answer.audio.type.includes("mp4") ? "mp4" : "webm";

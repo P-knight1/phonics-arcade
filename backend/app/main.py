@@ -64,6 +64,7 @@ def score(
     # Optional: tag the attempt with its game, or score typed text instead of audio (debug mode).
     game: str = Form("", pattern=r"^[a-z_]{0,32}$"),
     heard_text: str | None = Form(None, max_length=300),
+    second_try: bool = Form(False),  # the reading after an unclear one: always gets a verdict
     player: str | None = Depends(optional_player),  # logged in: the attempt is saved to this player
 ):
     received_ms = time.time() * 1000
@@ -75,6 +76,7 @@ def score(
     target_ph = list(g2p.phonemes(target))
     if not target_ph:
         raise HTTPException(422, "target has no sounds to say")
+    gap = None
     if heard_text is not None:
         heard, heard_ph = heard_text, list(g2p.phonemes(heard_text))
     else:
@@ -82,7 +84,10 @@ def score(
         if len(data) > MAX_AUDIO_BYTES:
             raise HTTPException(413, "Audio too large")
         try:
-            heard, heard_ph = speech.recognize(data, audio.content_type or "", arabic=scoring.is_arabic(target))
+            if scoring.is_arabic(target):
+                heard, (heard_ph, gap) = "", speech.recognize_fit(data, target_ph)
+            else:
+                heard, heard_ph = speech.recognize(data, audio.content_type or "", arabic=False)
         except speech.SpeechUnavailable as e:
             raise HTTPException(503, str(e))
         except speech.BadAudio as e:
@@ -95,11 +100,16 @@ def score(
         "heard_phonemes": heard_ph,
         # shortcut: includes upload time and assumes browser and server clocks agree; move to speech onset later.
         "response_ms": None if shown_at_ms is None else max(0, round(received_ms - shown_at_ms)),
-        **scoring.score(target_ph, heard_ph, target, heard),
+        **scoring.score(target_ph, heard_ph, target, heard, gap),
     }
-    if result["correct"] and not heard:  # the phoneme model gives sounds, not words
+    if heard_text is None and scoring.is_arabic(target):  # the phoneme model gives sounds: show them as letters
+        result["heard"] = target if result["correct"] else g2p.spell(heard_ph)
+    elif result["correct"] and not heard:
         result["heard"] = target
-    if player:
+    result["unclear"] = result["unclear"] and not second_try
+    if result["correct"] and gap is not None:
+        result["heard_phonemes"] = target_ph  # judged right on fit: don't count the transcript's slip against a sound
+    if player and not result["unclear"]:  # an unclear reading is read again; the second one counts
         db.save_attempt(player, game, target, result)
     return result
 

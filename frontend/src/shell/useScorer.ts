@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import * as api from "../api";
 import { useRecorder } from "./useRecorder";
 
@@ -16,14 +16,24 @@ export function useScorer(game: string) {
   const [notice, setNotice] = useState<string | null>(null);
   // /score answered 503: the speech model isn't available, so the typed-answer buttons take over.
   const [voiceDown, setVoiceDown] = useState(false);
+  // The word whose last reading was unclear: its next reading is the second try, which always gets a verdict.
+  const unclearTarget = useRef<string | null>(null);
 
-  /** Null when the answer couldn't be scored; `notice` then says why. */
+  /** Null when the answer couldn't be scored or needs another reading; `notice` then says why. */
   async function check(target: string, answer: SpokenAnswer, shownAtMs?: number): Promise<api.ScoreResult | null> {
     recorder.cancel();
     setBusy(true);
     setNotice(null);
     try {
-      return await api.score({ target, game, shownAtMs, ...answer });
+      const secondTry = unclearTarget.current === target;
+      const result = await api.score({ target, game, shownAtMs, secondTry, ...answer });
+      if (result.unclear) {
+        unclearTarget.current = target;
+        setNotice("لم نسمعها جيدًا. اقرأها مرة أخرى بصوت واضح.");
+        return null;
+      }
+      unclearTarget.current = null;
+      return result;
     } catch (e) {
       if (e instanceof api.ApiError && e.status === 503) {
         setVoiceDown(true);
