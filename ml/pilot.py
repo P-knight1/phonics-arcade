@@ -6,8 +6,8 @@
 clips.csv columns: path,target,said
     target  the vowelized word shown on screen
     said    what the reader actually said, written vowelized by the human listener (= target when read right)
-The human label is scoring(target, said); the app's verdict is scoring(target, model(audio)), exactly as /score
-does it. Keep recordings in ml/data/pilot/ (git-ignored) and follow docs/research.md section 7.
+The human label is scoring(target, said); the app's verdict is scoring(target, model(audio), gap), exactly as /score
+does it (a "read it again" result is counted with its error type, as the app's second try would be, and reported). Keep recordings in ml/data/pilot/ (git-ignored) and follow docs/research.md section 7.
 """
 import argparse
 import csv
@@ -66,11 +66,17 @@ def main():
         rows = list(csv.DictReader(f))
     verdicts = []
     for r in rows:
+        target = arabic_phonemes(r["target"])
         with open(r["path"], "rb") as audio:
-            _, heard = speech.recognize(audio.read(), "", arabic=True)
-        verdicts.append(scoring.score(arabic_phonemes(r["target"]), heard, r["target"]))
-        print(r["target"], "| said:", r["said"], "| app:", " ".join(heard), verdicts[-1]["error_type"])
-    print(json.dumps(agreement(rows, verdicts), ensure_ascii=False))
+            heard, gap = speech.recognize_fit(audio.read(), target)
+        verdicts.append(scoring.score(target, heard, r["target"], gap=gap))
+        v = verdicts[-1]
+        print(r["target"], "| said:", r["said"], "| app:", " ".join(heard), f"gap={gap if gap is None else round(gap, 1)}",
+              v["error_type"], "(read again)" if v["unclear"] else "")
+    result = agreement(rows, verdicts)
+    unclear = [h for h, v in ((human(r["target"], r["said"]), v) for r, v in zip(rows, verdicts)) if v["unclear"]]
+    result["read_again"] = {"clips": len(unclear), "of_them_read_right": sum(h["correct"] for h in unclear)}
+    print(json.dumps(result, ensure_ascii=False))
 
 
 if __name__ == "__main__":

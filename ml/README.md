@@ -109,11 +109,18 @@ information sheet and consent form, in Arabic and English, are in [docs/pilot-co
    (5 dot letters, 3 short vowels, 3 vowel lengths, 3 swapped letters, 1 missing and 1 added sound).
    The participant sees the `said` word and reads it; the app scores it against `target`, as if `target` had been shown.
    `python pilot.py --check` confirms each `said` really gives its intended error.
-2. **Record** each card as its own clip (phone voice memo, wav, webm or m4a; a second of silence either side)
-   into `ml/data/pilot/` (git-ignored, never commit it), named by pseudonym and card, e.g. `p03_17.m4a`.
-3. **Listen and write down** what was actually said, vowelized. Participants slip: if they read a card
-   differently, the `said` column records what they really said, not what the card asked for.
-4. **Score:** a CSV with columns `path,target,said`, then:
+2. **Record** with the pilot recorder, a local page that is not part of the game:
+   ```bash
+   .venv/Scripts/python pilot_app/server.py
+   ```
+   Open http://localhost:8010 in Chrome. It asks for a pseudonym code (`p01`), age band and dialect, and a tick
+   that the signed consent form is on file, then shows the 24 cards in a shuffled order, one clip per card, with
+   playback and re-recording. Clips go to `ml/data/pilot/` (git-ignored, never commit it) as `p03_17.webm`, and
+   `clips.csv` is written alongside. An interrupted session resumes at the first card not yet recorded.
+3. **Listen and write down** what was actually said, vowelized, on the review page (http://localhost:8010/#review).
+   Participants slip: if they read a card differently, `said` records what they really said, not what the card
+   asked for. The same page deletes a participant's clips and details on request.
+4. **Score** (`clips.csv` has the columns `path,target,said`; the app's verdict uses the same fit check as `/score`):
    ```bash
    .venv/Scripts/python pilot.py data/pilot/clips.csv
    ```
