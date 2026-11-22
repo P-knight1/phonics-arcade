@@ -108,7 +108,9 @@ from 300 Iqra'Eval dev recordings with each label's true reading as the target, 
 changed (dot twin, another short vowel, a dropped consonant) as a simulated misreading. At 3, 83% of right readings
 transcribed with a single slip passed and no misreading did. On 30 other dev recordings sent through `/score` as
 whole sentences, correct readings marked right rose from 8 to 17 (4 more were asked to read again) and none of the
-30 one-letter misreadings was accepted. The recordings are adults reading sentences; the pilot checks it on words.
+30 one-letter misreadings was accepted. The recordings are adults reading sentences. On single words in the adult
+pilot (research.md section 9) the check let through 10 real errors, nearly all one short vowel, that the model had
+transcribed correctly; asking for a second reading there is the next change to test.
 
 Check an item: `python -c "from app import g2p; print(g2p.phonemes('بَابْ'))"` from `backend/`
 (on Windows set `PYTHONIOENCODING=utf-8` first).
@@ -206,9 +208,9 @@ symbols in `SYMBOLS`; `ml/train.py` guarantees that.
 
 ## 8. Known limits
 
-- The model was trained on adults reading full MSA sentences. Accuracy on single words read by people with
-  dyslexia is measured by the adult pilot (`ml/pilot.py`), not yet.
-- No tolerance for Kuwaiti pronunciations yet (ق as `g`, ك as `tʃ`): the symbol set has no `g`-for-ق, and the
+- The model was trained on adults reading full MSA sentences. On single words read by four adults it matched a
+  human listener in 84% of recordings (research.md section 9). Children and readers with dyslexia are not measured yet.
+- No tolerance for dialect pronunciations yet (ق as `g`, ك as `tʃ`; in the pilot an Egyptian reader's ق as `g` was marked wrong): the symbol set has no `g`-for-ق, and the
   list in research.md section 4.1 needs a native speaker's check first.
 - Response time includes upload time; speech onset is not detected.
 - Spoken answers to story questions are not checked.

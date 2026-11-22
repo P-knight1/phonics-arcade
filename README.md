@@ -19,7 +19,7 @@ so it can tell قَمَر from قُمَر and حَبْل from جَبْل. The re
 | Part | What it does | Status |
 |---|---|---|
 | Phoneme recognition | A wav2vec2 model fine-tuned on 79 hours of Arabic speech hears which sounds were said | 9.75% phoneme error rate on held-out speech, vs 34.2% before fine-tuning and 11.8% for the published Iqra'Eval baseline ([ml/RESULTS.md](ml/RESULTS.md)) |
-| Error profiling | Aligns what was said with the target and names the Arabic error type | Done |
+| Error profiling | Aligns what was said with the target and names the Arabic error type | Adult pilot: matched a human listener in 84% of 96 recordings and caught 83% of real errors ([docs/research.md](docs/research.md) section 9) |
 | Adaptive practice | Bayesian Knowledge Tracing estimates mastery of every sound and picks the next words | Done |
 | Reading coach | An LLM turns each scored mistake into a short explanation and tip in Arabic, and sums up each round; it never hears audio or judges right and wrong | Done (needs an LLM endpoint) |
 | Generated stories | An LLM writes short vowelized stories around the reader's weak letters and interests; unvowelized output is rejected | Done |
@@ -91,7 +91,8 @@ and set these variables on the host:
 | `ANTHROPIC_API_KEY` | the LLM key for the coach and stories (set a spending limit on the account) |
 
 Mount a volume at `/data` so accounts and the downloaded model survive redeploys. Coach notes and stories are
-capped per player and per day, because each one is a paid call.
+capped per player and per day, because each one is a paid call. When the frontend is served (`STATIC_DIR` set), the
+API reference is switched off, security headers are added, and requests are limited per address.
 
 **Tests**
 
