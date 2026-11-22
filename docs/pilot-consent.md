@@ -1,7 +1,7 @@
 # Pilot: information sheet and consent form
 
 For the adult pilot only (18 and over). Print one copy per participant; they keep the information sheet.
-Fill in the bracketed fields before printing. Follows the checklist in [research.md](research.md) section 7.
+Fill in the bracketed fields before printing. The ethics steps are in [research.md](research.md#5-pilot-ethics).
 
 ---
 
