@@ -81,6 +81,7 @@ export class ApiError extends Error {
   }
 }
 
+// Empty in the production build: the backend serves the app, so requests go to the same origin.
 const BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/+$/, "");
 
 let token: string | null = null;
@@ -109,7 +110,6 @@ async function errorDetail(res: Response): Promise<string> {
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  if (!BASE_URL) throw new ApiError(0, "VITE_API_BASE_URL is not set");
   const sentToken = token;
   const headers = new Headers(init.headers);
   if (sentToken) headers.set("Authorization", `Bearer ${sentToken}`);

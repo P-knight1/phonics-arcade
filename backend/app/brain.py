@@ -46,10 +46,12 @@ STORY_SCHEMA = {
                 "type": "object",
                 "properties": {"q": {"type": "string"}, "answer": {"type": "string"}},
                 "required": ["q", "answer"],
+                "additionalProperties": False,
             },
         },
     },
     "required": ["story", "questions"],
+    "additionalProperties": False,
 }
 
 
@@ -139,7 +141,33 @@ def next_exercise(player_id: str, game: str, history: list[dict]) -> dict:
             "display_ms": spec["display_ms"], "reason": reason}
 
 
-def _complete(prompt: str, schema: dict = STORY_SCHEMA) -> str:
+CLAUDE_MODEL = "claude-opus-5-5"
+
+
+def _complete_claude(prompt: str, schema: dict, effort: str) -> str:
+    """Claude through the Anthropic SDK, with structured output so the reply is always JSON in `schema`."""
+    import anthropic
+
+    client = anthropic.Anthropic(timeout=90, max_retries=1)  # key from ANTHROPIC_API_KEY
+    request = {"model": os.getenv("LLM_MODEL") or CLAUDE_MODEL, "max_tokens": 16000,
+               "messages": [{"role": "user", "content": prompt}],
+               "output_config": {"effort": effort, "format": {"type": "json_schema", "schema": schema}}}
+    try:
+        try:  # on a policy decline the API retries on a fallback model inside the same call
+            resp = client.beta.messages.create(**request, betas=["server-side-fallback-2026-07-01"], fallbacks="default")
+        except anthropic.BadRequestError:  # an account or model without fallbacks: plain request
+            resp = client.messages.create(**request)
+    except anthropic.APIError as e:
+        raise LLMUnavailable(f"Claude request failed: {type(e).__name__}") from e
+    if resp.stop_reason != "end_turn":  # refusal or max_tokens: no usable JSON
+        raise LLMUnavailable(f"Claude stopped: {resp.stop_reason}")
+    return next((b.text for b in resp.content if b.type == "text"), "")
+
+
+def _complete(prompt: str, schema: dict = STORY_SCHEMA, effort: str = "medium") -> str:
+    """effort (Claude only): "low" for short coach notes, "medium" for stories."""
+    if os.getenv("ANTHROPIC_API_KEY"):
+        return _complete_claude(prompt, schema, effort)
     base_url, api_key, model = (os.getenv(k) for k in ("VLLM_BASE_URL", "VLLM_API_KEY", "VLLM_MODEL"))
     if not (base_url and model):
         raise LLMUnavailable("VLLM_BASE_URL / VLLM_MODEL are not set")
@@ -199,7 +227,8 @@ def story(player_id: str, weak: list[str], interests: list[str]) -> dict:
 # The reading coach: an LLM explains a mistake the phoneme model found, in words a reader understands. It never
 # judges right or wrong (scoring does) and never hears audio: it gets the target text and the two phoneme
 # sequences, rewritten as letters.
-COACH_SCHEMA = {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]}
+COACH_SCHEMA = {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"],
+                "additionalProperties": False}
 COACH_LIMIT = {"word": 300, "round": 600}  # characters
 ERROR_NAMES = {"none": "لا خطأ", "letter_reversal": "حرفان متبادلان", "missing_sound": "صوت ناقص",
                "added_sound": "صوت زائد", "substitution": "صوت مختلف", "no_response": "لم يقرأ",
@@ -229,7 +258,7 @@ def coach(player_id: str, kind: str, attempts: list[dict]) -> str:
     template = Template((CONTENT_DIR / "prompts" / f"coach_{kind}.txt").read_text(encoding="utf-8"))
     prompt = template.safe_substitute(attempts=lines,
                                       weak_sounds="، ".join(letter(p) for p in weakest(player_id)) or "لا شيء بعد")
-    raw = _complete(prompt, COACH_SCHEMA)
+    raw = _complete(prompt, COACH_SCHEMA, effort="low")
     try:
         text = json.loads(raw[raw.find("{"): raw.rfind("}") + 1])["text"].strip()
     except (ValueError, KeyError, TypeError) as e:

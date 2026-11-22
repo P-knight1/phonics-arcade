@@ -17,7 +17,7 @@ def llm(monkeypatch):
         reply = json.dumps({"text": "انْظُرْ إِلَى النُّقَطِ."})
         prompts = []
 
-        def __call__(self, prompt, schema=None):
+        def __call__(self, prompt, schema=None, effort=None):
             self.prompts.append(prompt)
             return self.reply
     fake = Fake()
@@ -76,3 +76,14 @@ def test_coach_mock_mode(mock_client, login):
     pid, auth = login(mock_client)
     r = ask(mock_client, auth, pid, "round", [attempt("حَبْلْ", "جَبْلْ", "dot_confusion")])
     assert r.status_code == 200 and g2p.is_arabic(r.json()["text"])
+
+
+def test_coach_has_a_daily_limit(client, login, llm, monkeypatch):
+    from app import main
+    monkeypatch.setattr(main, "LLM_DAILY", {"coach": 2, "story": 8})
+    monkeypatch.setattr(main, "_llm_calls", {})
+    pid, auth = login(client)
+    attempt = [{"target": "قَلَمْ", "target_phonemes": ["q", "a", "l", "a", "m"], "heard_phonemes": ["k", "a", "l", "a", "m"],
+                "correct": False, "error_type": "substitution"}]
+    codes = [ask(client, auth, pid, "word", attempt).status_code for _ in range(3)]
+    assert codes == [200, 200, 429]

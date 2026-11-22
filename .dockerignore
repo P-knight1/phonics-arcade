@@ -1,0 +1,17 @@
+# Only backend/, content/ and frontend/ go into the image. Never secrets, data, models or private notes.
+.git
+.env
+.env.*
+.claude
+CLAUDE.md
+AGENTS.md
+submission
+data
+ml
+**/node_modules
+**/.venv
+**/__pycache__
+**/.pytest_cache
+frontend/dist
+backend/tests
+docs

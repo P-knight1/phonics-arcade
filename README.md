@@ -79,6 +79,20 @@ Open http://localhost:5173. Add `?debug=1` to answer by typing instead of speaki
 
 **Docker** (backend only, mock mode and typed answers): `docker compose up --build`.
 
+**Hosting** (the public demo): the root `Dockerfile` builds one image with the API, the speech runtime and the
+built frontend, served from one address (Railway, or any Docker host with HTTPS: browsers only allow the
+microphone on HTTPS). The model is not in the image. Upload `ml/models/arabic-phoneme` to a Hugging Face model repo
+and set these variables on the host:
+
+| Variable | Value |
+|---|---|
+| `ARABIC_SPEECH_MODEL` | the Hugging Face repo id of the model |
+| `HF_TOKEN` | a read-only token, if that repo is private |
+| `ANTHROPIC_API_KEY` | the LLM key for the coach and stories (set a spending limit on the account) |
+
+Mount a volume at `/data` so accounts and the downloaded model survive redeploys. Coach notes and stories are
+capped per player and per day, because each one is a paid call.
+
 **Tests**
 
 ```bash

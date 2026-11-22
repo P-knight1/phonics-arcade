@@ -3,9 +3,11 @@ import os
 import threading
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path as FilePath
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Path, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from . import brain, db, g2p, mock, rhythm, scoring, speech
@@ -49,6 +51,28 @@ def logged_in(player: str | None = Depends(optional_player)) -> str:
 def own_data(player: str, player_id: str) -> None:
     if player_id != player:
         raise HTTPException(403, "That is another player's data")
+
+
+# Every coach note and story is a paid LLM call, and the site is public: cap them per player and for the whole site.
+# shortcut: counted in memory, so a restart resets them and several server processes would each count; fine for one
+# small instance, move to the database if the app scales out. The provider's spending limit is the hard stop.
+LLM_DAILY = {"coach": 80, "story": 8}
+LLM_SITE_DAILY = 2000
+_llm_calls: dict[tuple[str, str, str], int] = {}
+_llm_lock = threading.Lock()
+
+
+def llm_budget(player: str, kind: str) -> None:
+    day = time.strftime("%Y-%m-%d")
+    with _llm_lock:
+        if any(k[0] != day for k in _llm_calls):  # a new day: forget yesterday
+            for k in [k for k in _llm_calls if k[0] != day]:
+                del _llm_calls[k]
+        mine, site = (day, player, kind), (day, "*", "*")
+        if _llm_calls.get(mine, 0) >= LLM_DAILY[kind] or _llm_calls.get(site, 0) >= LLM_SITE_DAILY:
+            raise HTTPException(429, "Daily limit reached, try again tomorrow")
+        _llm_calls[mine] = _llm_calls.get(mine, 0) + 1
+        _llm_calls[site] = _llm_calls.get(site, 0) + 1
 
 
 @app.get("/health")
@@ -209,6 +233,9 @@ def story(req: StoryRequest, player: str = Depends(logged_in)):
     own_data(player, req.player_id)
     if MOCK:
         return mock.story(req.weak_sounds, req.interests)
+    if not brain.story_status(req.player_id)["unlocked"]:  # locked stories cost nothing: don't count them
+        raise HTTPException(409, "stories open after more practice")
+    llm_budget(player, "story")
     try:
         return brain.story(req.player_id, req.weak_sounds, req.interests)
     except brain.StoryLocked as e:
@@ -230,6 +257,7 @@ def coach(req: CoachRequest, player: str = Depends(logged_in)):
     own_data(player, req.player_id)
     if MOCK:
         return mock.coach(req.kind)
+    llm_budget(player, "coach")
     try:
         return {"text": brain.coach(req.player_id, req.kind, [a.model_dump() for a in req.attempts])}
     except brain.LLMUnavailable as e:
@@ -282,3 +310,18 @@ def logout(creds: HTTPAuthorizationCredentials | None = Depends(bearer)):
 @app.get("/me", response_model=Player)
 def me(player: str = Depends(logged_in)):
     return db.get_player(player)
+
+
+# Hosting: the built frontend (frontend/dist) is served from the same address as the API, one service, no CORS.
+# Registered last, so every API route above wins; any other path gets the app (it routes in the browser).
+STATIC_DIR = os.getenv("STATIC_DIR")
+if STATIC_DIR and FilePath(STATIC_DIR).is_dir():
+    _static = FilePath(STATIC_DIR).resolve()
+
+    @app.get("/{path:path}", include_in_schema=False)
+    def frontend(path: str):
+        file = (_static / path).resolve()
+        if path and file.is_file() and _static in file.parents:  # a real asset inside dist, never outside it
+            return FileResponse(file)
+        return FileResponse(_static / "index.html")
+

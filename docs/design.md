@@ -151,9 +151,11 @@ of the offsets: lower is steadier). Every word is saved as its own attempt. Type
 
 ## 5. Generated stories
 
-`/story` asks an LLM for a short story with questions, built from the player's weakest letters (BKT), the real words they misread lately in Word Flash and Rhythmic Reading, and their interests. Stories unlock after 20 word-game attempts (`GET /story/status/{player_id}`; `/story` returns `409` before that), so there is enough data to target. The reader reads the same story up to three times, sentence by sentence, and sees sound accuracy and time for each reading (repeated reading), then the questions. Any
+`/story` asks an LLM for a short story with questions, built from the player's weakest letters (BKT), the real words they misread lately in Word Flash and Rhythmic Reading, and their interests. Stories unlock after 20 word-game attempts (`GET /story/status/{player_id}`; `/story` returns `409` before that), so there is enough data to target. The reader reads the same story up to three times, sentence by sentence, and sees sound accuracy and time for each reading (repeated reading), then the questions. With
+`ANTHROPIC_API_KEY` set, the coach and stories use Claude (Opus 5.5 by default, `LLM_MODEL` to change it) through
+the Anthropic SDK, with structured JSON output, low effort for coach notes and medium for stories. Otherwise any
 OpenAI-compatible endpoint works (`VLLM_BASE_URL`, `VLLM_API_KEY`, `VLLM_MODEL` in `.env`; the names are
-historical). The prompt is [content/prompts/story.txt](../content/prompts/story.txt).
+historical). Each player gets at most 80 coach notes and 8 stories a day, and the site 2,000 LLM calls a day. The prompt is [content/prompts/story.txt](../content/prompts/story.txt).
 
 - It requests JSON-schema output and falls back to plain output, validated with Pydantic, when the server
   doesn't support schemas.

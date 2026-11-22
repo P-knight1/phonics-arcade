@@ -275,3 +275,23 @@ def test_borderline_reading_is_read_again_and_not_saved(client, monkeypatch, log
 def test_clear_misreading_stays_wrong(client, monkeypatch):
     r = fit(client, monkeypatch, ["k", "a", "l", "a", "m"], 14.0)
     assert (r["correct"], r["unclear"]) == (False, False)
+
+
+def test_built_frontend_is_served_with_the_api(tmp_path, monkeypatch):
+    import importlib
+    from fastapi.testclient import TestClient
+    from app import main
+    (tmp_path / "index.html").write_text("<html>app</html>")
+    (tmp_path / "assets").mkdir()
+    (tmp_path / "assets" / "a.js").write_text("js")
+    (tmp_path.parent / "secret.txt").write_text("no")
+    monkeypatch.setenv("STATIC_DIR", str(tmp_path))
+    try:
+        c = TestClient(importlib.reload(main).app)
+        assert c.get("/assets/a.js").text == "js"
+        assert c.get("/games/word-flash").text == "<html>app</html>"      # browser routes get the app
+        assert c.get("/../secret.txt").text != "no" and c.get("/%2e%2e/secret.txt").text != "no"
+        assert c.get("/health").json()["ok"]                              # the API still wins
+    finally:
+        monkeypatch.delenv("STATIC_DIR")
+        importlib.reload(main)
