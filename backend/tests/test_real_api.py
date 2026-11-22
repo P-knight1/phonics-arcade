@@ -292,6 +292,19 @@ def test_built_frontend_is_served_with_the_api(tmp_path, monkeypatch):
         assert c.get("/games/word-flash").text == "<html>app</html>"      # browser routes get the app
         assert c.get("/../secret.txt").text != "no" and c.get("/%2e%2e/secret.txt").text != "no"
         assert c.get("/health").json()["ok"]                              # the API still wins
+        page = c.get("/")
+        assert "frame-ancestors 'none'" in page.headers["content-security-policy"]
+        assert page.headers["x-content-type-options"] == "nosniff"
+        assert c.get("/openapi.json").text == "<html>app</html>"         # no API map on the public site
+        assert "access-control-allow-origin" not in c.get("/health", headers={"Origin": "https://evil.example"}).headers
     finally:
         monkeypatch.delenv("STATIC_DIR")
         importlib.reload(main)
+
+
+def test_login_attempts_are_limited_per_address(client):
+    for _ in range(10):
+        assert client.post("/login", json={"name": "nobody", "password": "wrong-password"}).status_code == 401
+    assert client.post("/login", json={"name": "nobody", "password": "wrong-password"}).status_code == 429
+    other = {"X-Forwarded-For": "203.0.113.9"}  # another caller is not blocked
+    assert client.post("/login", json={"name": "nobody", "password": "wrong-password"}, headers=other).status_code == 401

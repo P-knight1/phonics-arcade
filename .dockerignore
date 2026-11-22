@@ -1,7 +1,7 @@
 # Only backend/, content/ and frontend/ go into the image. Never secrets, data, models or private notes.
 .git
-.env
-.env.*
+**/.env
+**/.env.*
 .claude
 CLAUDE.md
 AGENTS.md

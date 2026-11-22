@@ -15,6 +15,12 @@ def stories_unlocked(monkeypatch):
     monkeypatch.setattr(brain, "STORY_UNLOCK", 0)
 
 
+@pytest.fixture(autouse=True)
+def fresh_rate_limits():
+    """Tests make far more requests from one address than a player would."""
+    main._hits.clear()
+
+
 @pytest.fixture
 def mock_client(monkeypatch):
     monkeypatch.setattr(main, "MOCK", True)

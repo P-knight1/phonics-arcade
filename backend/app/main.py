@@ -5,7 +5,7 @@ import time
 from contextlib import asynccontextmanager
 from pathlib import Path as FilePath
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, Path, Query, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Path, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -26,9 +26,32 @@ async def lifespan(_app):
     yield
 
 
-app = FastAPI(title="Phonics Arcade API", lifespan=lifespan)
-# Browser game runs on another origin (localhost dev server, hosted frontend) than the API.
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+PUBLIC = bool(os.getenv("STATIC_DIR"))  # hosted: the site and API share one public address
+# No /docs or /openapi.json on the public site: they map every endpoint for anyone probing it.
+app = FastAPI(title="Phonics Arcade API", lifespan=lifespan,
+              docs_url=None if PUBLIC else "/docs", redoc_url=None, openapi_url=None if PUBLIC else "/openapi.json")
+# Hosted, the page and the API share one origin; only the local dev server (another port) needs CORS.
+app.add_middleware(CORSMiddleware, allow_origin_regex=r"^http://(localhost|127\.0\.0\.1)(:\d+)?$",
+                   allow_methods=["GET", "POST"], allow_headers=["Authorization", "Content-Type"])
+
+SECURITY_HEADERS = {
+    # Only this site's own files; recordings play from blob: URLs; no framing (clickjacking).
+    "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+                               "img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; "
+                               "object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "no-referrer",
+    "Permissions-Policy": "microphone=(self), camera=(), geolocation=()",
+    "Strict-Transport-Security": "max-age=31536000",
+}
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    if PUBLIC:  # the Vite dev server serves the page locally, so headers only matter hosted
+        response.headers.update(SECURITY_HEADERS)
+    return response
 bearer = HTTPBearer(auto_error=False)  # "Authorization: Bearer <token>"; also adds the Authorize button to /docs
 
 
@@ -48,6 +71,37 @@ def logged_in(player: str | None = Depends(optional_player)) -> str:
     return player
 
 
+# Per-address request limits, so one script can't brute-force passwords, flood the database with guests,
+# or tie up the speech model for everyone. shortcut: in memory, one server process; move to a shared store if it scales.
+_hits: dict[tuple[str, str], list[float]] = {}
+_hits_lock = threading.Lock()
+
+
+def client_ip(request: Request) -> str:
+    # Railway's proxy appends the caller's address last; earlier entries can be typed by the caller.
+    forwarded = request.headers.get("x-forwarded-for", "")
+    return forwarded.rsplit(",", 1)[-1].strip() or (request.client.host if request.client else "?")
+
+
+def rate_limit(bucket: str, most: int, seconds: int):
+    def check(request: Request) -> None:
+        now, key = time.time(), (bucket, client_ip(request))
+        with _hits_lock:
+            if len(_hits) > 50_000:  # never grow without bound
+                _hits.clear()
+            recent = [t for t in _hits.get(key, []) if t > now - seconds]
+            if len(recent) >= most:
+                raise HTTPException(429, "Too many requests, wait a little and try again")
+            _hits[key] = recent + [now]
+    return Depends(check)
+
+
+AUTH_LIMIT = rate_limit("auth", 10, 60)          # login and sign-up attempts
+GUEST_LIMIT = rate_limit("guest", 20, 3600)      # each guest gets its own LLM allowance, so cap new ones
+SPEECH_LIMIT = rate_limit("speech", 60, 60)      # one reading a second is more than any child manages
+LLM_LIMIT = rate_limit("llm", 30, 60)
+
+
 def own_data(player: str, player_id: str) -> None:
     if player_id != player:
         raise HTTPException(403, "That is another player's data")
@@ -57,7 +111,7 @@ def own_data(player: str, player_id: str) -> None:
 # shortcut: counted in memory, so a restart resets them and several server processes would each count; fine for one
 # small instance, move to the database if the app scales out. The provider's spending limit is the hard stop.
 LLM_DAILY = {"coach": 80, "story": 8}
-LLM_SITE_DAILY = 2000
+LLM_SITE_DAILY = {"coach": 1000, "story": 100}  # site-wide per day, whatever the number of players
 _llm_calls: dict[tuple[str, str, str], int] = {}
 _llm_lock = threading.Lock()
 
@@ -68,8 +122,8 @@ def llm_budget(player: str, kind: str) -> None:
         if any(k[0] != day for k in _llm_calls):  # a new day: forget yesterday
             for k in [k for k in _llm_calls if k[0] != day]:
                 del _llm_calls[k]
-        mine, site = (day, player, kind), (day, "*", "*")
-        if _llm_calls.get(mine, 0) >= LLM_DAILY[kind] or _llm_calls.get(site, 0) >= LLM_SITE_DAILY:
+        mine, site = (day, player, kind), (day, "*", kind)
+        if _llm_calls.get(mine, 0) >= LLM_DAILY[kind] or _llm_calls.get(site, 0) >= LLM_SITE_DAILY[kind]:
             raise HTTPException(429, "Daily limit reached, try again tomorrow")
         _llm_calls[mine] = _llm_calls.get(mine, 0) + 1
         _llm_calls[site] = _llm_calls.get(site, 0) + 1
@@ -80,7 +134,7 @@ def health():
     return {"ok": True, "mock": MOCK}
 
 
-@app.post("/score", response_model=ScoreResponse)
+@app.post("/score", response_model=ScoreResponse, dependencies=[SPEECH_LIMIT])
 def score(
     target: str = Form(..., min_length=1, max_length=300),  # up to one story sentence
     audio: UploadFile | None = File(None),
@@ -138,7 +192,7 @@ def score(
     return result
 
 
-@app.post("/score-rhythm", response_model=RhythmResponse)
+@app.post("/score-rhythm", response_model=RhythmResponse, dependencies=[SPEECH_LIMIT])
 def score_rhythm(
     targets: str = Form(..., max_length=2000),  # JSON list of the words, in the order they were shown
     slot_ms: int = Form(..., ge=400, le=5000),  # time between words
@@ -179,7 +233,7 @@ def score_rhythm(
     return result
 
 
-@app.post("/timing-test")
+@app.post("/timing-test", dependencies=[SPEECH_LIMIT])
 def timing_test(
     audio: UploadFile = File(...),
     # Optional, for the real-word check: the words shown, and when, as in /score-rhythm.
@@ -228,7 +282,7 @@ def next_exercise(req: NextExerciseRequest, player: str = Depends(logged_in)):
         raise HTTPException(404, f"No content for game '{req.game}' yet (content/{req.game}.json)")
 
 
-@app.post("/story", response_model=StoryResponse)
+@app.post("/story", response_model=StoryResponse, dependencies=[LLM_LIMIT])
 def story(req: StoryRequest, player: str = Depends(logged_in)):
     own_data(player, req.player_id)
     if MOCK:
@@ -252,7 +306,7 @@ def story_status(player_id: str = Path(..., min_length=1, max_length=64), player
     return brain.story_status(player_id)
 
 
-@app.post("/coach", response_model=CoachResponse)
+@app.post("/coach", response_model=CoachResponse, dependencies=[LLM_LIMIT])
 def coach(req: CoachRequest, player: str = Depends(logged_in)):
     own_data(player, req.player_id)
     if MOCK:
@@ -277,7 +331,7 @@ def progress(
 
 
 # Accounts are plain storage (no AI to wait for), so they are real in mock mode too.
-@app.post("/players", response_model=LoginResponse, status_code=201)
+@app.post("/players", response_model=LoginResponse, status_code=201, dependencies=[AUTH_LIMIT])
 def register(req: Register):
     try:
         player = db.create_account(req.name, req.password, req.interests)
@@ -286,7 +340,7 @@ def register(req: Register):
     return {**player, "token": db.start_login(player["player_id"])}
 
 
-@app.post("/login", response_model=LoginResponse)
+@app.post("/login", response_model=LoginResponse, dependencies=[AUTH_LIMIT])
 def login(req: Login):
     player = db.check_password(req.name, req.password)
     if player is None:
@@ -294,7 +348,7 @@ def login(req: Login):
     return {**player, "token": db.start_login(player["player_id"])}
 
 
-@app.post("/guest", response_model=LoginResponse, status_code=201)
+@app.post("/guest", response_model=LoginResponse, status_code=201, dependencies=[GUEST_LIMIT])
 def guest(req: GuestStart | None = None):
     """Play without an account. Everything is deleted on logout, or GUEST_HOURS after starting."""
     player = db.create_guest(req.interests if req else [])
