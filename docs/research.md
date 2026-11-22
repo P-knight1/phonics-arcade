@@ -1,219 +1,169 @@
-# Research: Arabic dyslexia, competitors, evidence and technology
+# Research
 
-Collected 14–15 Nov 2026 for the Kuwait Dyslexia Association (KDA) AI competition (deadline 30 Nov). Every claim has a source at the end of its section; primary sources (journal, PubMed/PMC, registry, official repo) were checked on 15 Nov unless marked otherwise. **"Unverified" marks a claim we could only see in a secondary source or abstract: don't quote it in the pitch until the original has been read.**
+The evidence behind the app: what makes dyslexia in Arabic different, why each activity was chosen, how the app
+compares with existing tools, and what the adult pilot measured. Full references are at the end.
 
-**Positioning in one line:** the first Arabic reading tool that listens to a child read aloud, recognises *Arabic-specific* dyslexic error patterns (short vowels, dot-letters, letter position), and adapts practice to them, using methods with published evidence. Target users: children. **Pilot: adults only** (usability and scoring accuracy, not efficacy; results in section 9). No medical claims: practice and support, never diagnosis.
+The app is a practice and support tool. It makes no clinical claims, and the app itself has not yet been tested with
+children.
 
----
+## 1. Dyslexia in Arabic
 
-## 1. Dyslexia in Arabic: what is different
-
-| Feature | Why it matters for dyslexic readers | What we do with it |
+| Feature of Arabic | Why it matters | What the app does |
 |---|---|---|
-| **Short vowels are diacritics (harakat)** and usually omitted in adult text | "Vowel dyslexia" (a selective problem with vowel letters, including reading short vowels as long and long as short) was one of the most frequent types in an Arabic sample (Friedmann & Haddad-Hanna 2014, pp. 140-142). Vowelization plays a pivotal role for dyslexic readers | Score vowels separately; adapt how many harakat are shown |
-| **Letters that differ only by dots**: ب ت ث، ج ح خ، د ذ، ر ز، س ش، ص ض، ط ظ، ع غ، ف ق | Arabic's b/d. In typically developing children (grades 1, 2, 4), visual-orthographic errors were over a quarter of all spelling errors (Yassin, Share & Shalhoub-Awwad 2020). That category also covers letter-shape and joining errors, not only dots, and it is not a dyslexia sample. Example: حبل (rope) read as جبل (mountain) | A dedicated error type, `dot_confusion`, and practice built on these pairs |
-| **Letter-position errors**: letters migrate within a word | A described Arabic subtype. Migrations that keep the letter's shape are far more common than ones that change it | Detect order swaps as `letter_position` |
-| **Letter shape changes with position** (initial, middle, final, isolated) | Extra visual load | UI: generous spacing, larger marks (section 6) |
-| **Diglossia**: children speak a dialect but read Modern Standard Arabic | Strong impact on reading in dyslexic children. A Kuwait study of primary pupils found MSA and shared words easier to read than dialect-only words, and phonological awareness was the only unique predictor of reading | Start with words shared between Kuwaiti dialect and MSA; accept regular dialect pronunciations in scoring (section 4.1) |
-| **Morphology**: words are built from roots + patterns (ك ت ب → كَتَبَ، كاتِب، مَكتَب) | Morphological awareness is the **strongest predictor of reading comprehension** in Arabic children; phonological awareness also matters | A root-and-pattern game is a real, Arabic-only innovation |
-| **Vowel length is meaningful** (كَتَبَ vs كاتَب) | Long vs short vowels change the word | Long and short vowels are separate symbols (`aa` vs `a`), so `vowel_length` is its own error type |
+| Short vowels are marks above and below letters; long vowels are letters | Vowel dyslexia, a selective difficulty with vowel letters that includes reading short vowels as long and long as short, was one of the most frequent types in an Arabic sample (Friedmann & Haddad-Hanna 2014) | Scores vowels and vowel length, not only consonants |
+| Letters that differ only by their dots: ب ت ث، ج ح خ، د ذ، ر ز، س ش، ص ض، ط ظ، ع غ، ف ق | Arabic's equivalent of b/d. Visual-orthographic errors, which include dot errors, were over a quarter of all spelling errors in grades 1, 2 and 4 (Yassin et al. 2020) | A dedicated error type and practice built on these pairs |
+| Letters can migrate within a word | Letter position dyslexia is a described Arabic type (Friedmann & Haddad-Hanna 2014) | Detects swapped letters |
+| Children speak a dialect but read Modern Standard Arabic | Diglossia, vowelization and morphology are the three features that shape Arabic word reading (Saiegh-Haddad 2018) | Starts with common words; dialect tolerance is future work |
 
-**Theory to cite:** Saiegh-Haddad's MAWRID model of Arabic word reading names three shaping features: vowelization, morphology and diglossia. Friedmann & Haddad-Hanna describe the Arabic dyslexia subtypes (vowel dyslexia, letter position dyslexia).
+**Prevalence.** A meta-analysis of 18 studies in Arab countries (30,243 children aged 6–13) found a pooled
+prevalence of developmental dyslexia of 11%, higher in Gulf countries (24% against 13%, from 8 Gulf studies)
+(Aldakhil 2024).
 
-**Prevalence (verified on PubMed):** Aldakhil 2024, *Research in Developmental Disabilities* 152:104812, a systematic review and meta-analysis of 18 studies (30,243 children aged 6–13; 8 from Egypt, 4 from Saudi Arabia). Pooled prevalence **11%**; higher in boys, in Asian Arab countries (24% vs 12% in Africa) and in **Gulf countries (24% vs 13% non-Gulf)**. The abstract gives **no Kuwait-specific figure**, and the Gulf estimate rests on few studies, so say "about 1 in 4 in Gulf studies" with that caveat.
+## 2. How the activities connect to the evidence
 
-**Kuwait figures (newspaper only):** KDA told KUNA (reported by Al-Jarida, Jan 2017) that its survey of 30,000+ pupils in 650 state schools found 3.6% overall, with figures of about 12% (boys) and 10% (girls) that don't add up to the overall rate. **Unverified:** no published report found. Don't quote a Kuwait number in the pitch; use Aldakhil. The 2019 KISR paper also calls dyslexia one of the most common learning disabilities in Kuwaiti schools.
+Arabic dyslexia shows itself in specific errors. A reader improves on an error when told about it precisely and soon,
+so the app listens sound by sound and names the error instead of accepting a near miss. It then practises the weak
+sounds in four activities, one for each layer of reading, and knowledge tracing links them so that a mistake in one
+shapes practice in all of them.
 
-**Kuwait context:** a Kuwait thesis found teachers lacked knowledge of dyslexia and of early intervention. KDA and the Kuwait Institute for Scientific Research (KISR) built *Sinbad and Jasmin* (سندباد وياسمينة), an adaptive Arabic app that trains **short-term memory** (al-Ghurayr & al-Naqi, *Journal of Engineering Research* 7(1), 2019). It was tested on a selected group of KDA students, with only a preliminary analysis and a long-term study "planned". **No outcome data are published.** It does not listen to reading.
-
-Sources: [Friedmann & Haddad-Hanna, Types of developmental dyslexia in Arabic](https://www.researchgate.net/profile/Naama-Friedmann/publication/289507044_Types_of_Developmental_Dyslexia_in_Arabic/links/578f4d7b08ae81b44671c314/Types-of-Developmental-Dyslexia-in-Arabic.pdf) · [MAWRID model](https://cris.iucc.ac.il/en/publications/mawrid-a-model-of-arabic-word-reading-in-development/) · [Schiff & Saiegh-Haddad 2017, diglossia and vowelization](https://link.springer.com/10.1007/s11145-016-9713-1) · [Manifestations of dyslexia in Arabic-speaking pupils (letter similarity)](https://aleph.edinum.org/8334?lang=en) · [Typology of visual dyslexia errors in Arabic](https://crstdla.dz/ojs/index.php/allj/article/view/152) · [Yassin et al. 2020, Learning to spell in Arabic (PMC)](https://pmc.ncbi.nlm.nih.gov/articles/PMC7497809) · [Metalinguistic skills review, Frontiers 2022](https://www.frontiersin.org/journals/communication/articles/10.3389/fcomm.2022.984340/pdf) · [Aldakhil 2024 meta-analysis (PubMed 39079361)](https://pubmed.ncbi.nlm.nih.gov/39079361/) · [KDA survey, Al-Jarida 2017 (Arabic)](https://www.aljarida.com/articles/1485593604316030300) · [Ali 2014, reading and diglossia in Kuwaiti primary schools (Leeds thesis)](https://etheses.whiterose.ac.uk/7457/) · [Kuwait thesis: teachers' knowledge](https://etheses.whiterose.ac.uk/id/eprint/17437/) · [Sinbad and Jasmin, al-Ghurayr & al-Naqi 2019 (abstract)](https://search.emarefa.net/en/detail/BIM-1494929-adaptive-arabic-application-for-enhancing-short-term-memory-) · [Same, journal page](https://journals.ku.edu.kw/jer/index.php/JER/article/view/7894) · [Phonological awareness in Kuwaiti dyslexic children](https://openaccess.library.uitm.edu.my/Record/doaj-85d99b1f39b34777b5a37b54df81bcc4)
-
----
-
-## 2. Evidence for each part of the product
-
-**How the parts fit together.** The product rests on one chain of reasoning. Arabic dyslexia shows itself in
-specific errors: dots, short vowels, vowel length, letter order (section 1). A reader improves on an error only when
-told about it precisely and soon, so the app listens sound by sound instead of accepting a near miss, and names the
-error. It then practises the weak sounds in the forms of training with the best evidence, each covering a different
-layer of reading:
-
-| Layer of reading | Activity | Main evidence | What we took from it |
+| Layer | Activity | Main evidence | What we took from it |
 |---|---|---|---|
-| Sounds | Sound Surgery | National Reading Panel meta-analysis (NICHD 2000; Ehri et al. 2001) | Two kinds of sound manipulation only (deletion, substitution), done on the written word, because training with letters worked best |
-| Words | Word Flash | Reading Acceleration Program (Horowitz-Kraus et al. 2014); speech-recognition reading tutors | Display time set just above the reader's pace, with sound-level feedback on every word |
-| Timing | Rhythmic Reading | Rhythm-based reading training (Flaugnacco 2015; Bonacina 2015; Cancer & Antonietti 2022 review) | Words read *on* the beat, the form the 2022 review found works best |
-| Text | My Story | Repeated reading meta-analyses (Therrien 2004; Lee & Yoon 2017) | Up to three readings of one passage, built from the reader's own weak letters and words |
-| All of them | Feedback and coach | Feedback meta-analysis (Wisniewski, Zierer & Hattie 2020) | Tell the reader exactly what went wrong; the coach explains, it never decides |
-| All of them | Adaptive practice and Progress | Knowledge tracing in tutoring systems (Corbett & Anderson 1995) | Mastery of each sound decides the next words; teachers and parents see the trend |
+| Sounds | Sound Surgery | National Reading Panel (NICHD 2000; Ehri et al. 2001) | Two kinds of sound manipulation, done on the written word |
+| Words | Word Flash | Reading Acceleration Program (Horowitz-Kraus et al. 2014) | Display time set just above the reader's own pace |
+| Timing | Rhythmic Reading | Flaugnacco et al. 2015; Bonacina et al. 2015; Cancer & Antonietti 2022 | Words read in time with a beat |
+| Text | My Story | Therrien 2004; Lee & Yoon 2017 | The same passage read up to three times |
+| All | Feedback and coach | Wisniewski et al. 2020 | Say exactly what went wrong |
+| All | Adaptive practice | Corbett & Anderson 1995 | Mastery of each sound decides the next words |
 
-The listening and scoring is shared by every activity, and it is the part this project measured (section 9). The
-activities themselves rest on published evidence from other languages; none of them has been tested in Arabic, by
-us or anyone else, so we claim what each method has shown elsewhere, never that our app improves reading.
+Most of this evidence comes from other languages, and none of it tests this app. We claim what each method has shown,
+not that the app improves reading.
 
-The table below gives the detail and the caveats for each part.
+### Sound Surgery (phonemic awareness)
 
-| Part | Evidence | Strength | How to say it |
-|---|---|---|---|
-| **Phonological awareness training** (Sound Surgery) | **US National Reading Panel meta-analysis** (Ehri et al. 2001, *Reading Research Quarterly*; NRP 2000 report, ch. 2): phonemic-awareness instruction had a large effect on phonemic awareness (d=0.86) and moderate effects on reading (d=0.53) and spelling (0.59), held at follow-up; moderate effects on reading for disabled readers, but no effect on their spelling; **one or two kinds of sound manipulation beat three or more** (Sound Surgery uses two: deletion and substitution); 5–18 hours of teaching worked best; the most effective programmes had children manipulate sounds **with letters** (NRP report), which is why Sound Surgery works on the written word. Arabic studies, all Layes and colleagues (Algeria) unless noted: **2015** (*Bellaterra J.*): 10 dyslexic children vs 10 typical readers, no untrained dyslexic control. **2019** (*Reading & Writing Quarterly*): 20 trained vs 20 age- and reading-matched controls. **2020** (*Int. J. Disability, Development & Education*), combined PA + print, Grade 4: 22 vs 22, gains held at follow-up. **Al Farsi & Imam 2017** (*J. Educational & Psychological Studies*, Sultan Qaboos Univ., Oman): 14 children with reading disabilities **randomly assigned** (7 vs 7), 10 weeks; gains on PA and decoding, not on passage fluency. All found gains in phonological skills and word/pseudoword reading | Consistent direction, **very small samples, mostly non-randomised**; strong international evidence behind it | "Phonological training improved reading in Arabic-speaking children in several small studies" |
-| **Morphological training** (roots game: designed, not built) | Third grade, Algeria (JISNE 2021, El-Oued group): 12 trained vs 13 controls; gains in morphological awareness, word and pseudoword reading, and transfer to phonological awareness. The Arabic version of the paper reports 23 pupils with 10 trained, so the n is slightly inconsistent | Small but Arabic-specific | "Built on the morphological structure of Arabic, the strongest predictor of comprehension" |
-| **Teaching short vowels / fading harakat** (designed, not built) | Asadi 2017 (1,516 children, grades 1–6): unvowelized words were read **more** accurately and fluently from grade 3 on; in grades 1–2 accuracy was similar. Al-Balushi et al. 2020 (Oman, 200 fourth graders, **descriptive**, not an intervention): diacritics made no difference to rapid naming of letters and single words in poor readers; the authors *recommend* teaching short vowels. Abu-Rabia's studies found vowels help accuracy and comprehension; others failed to replicate. Partial diacritization (only the marks needed to disambiguate) read more easily than full marking in one behavioural experiment with general readers (ElNokrashy & AlKhamissi 2024), **not dyslexic readers** | Mixed: supports **adaptive** vowel marks, not "always fully vowelized". No Arabic RCT of a vowel-fading intervention found | "Vowel marks are given where the reader needs them and faded as they master them" (an innovation; Read Along doesn't do this) |
-| **Rhythm and music** (Rhythmic Reading) | **Flaugnacco et al. 2015** (*PLoS One*, NCT02316873): randomised controlled trial, 46 Italian children aged 8–11 with dyslexia, 30 weeks of rhythm-focused music classes vs painting classes: larger gains in pseudoword reading accuracy (the primary outcome), phonemic blending and pseudoword repetition, about half as many children left as very poor text readers, and larger gains in **verbal working memory and auditory attention**; no difference in reading speed. **Bonacina et al. 2015** (*Front. Psychol.*): Rhythmic Reading Training (RRT), reading exercises read in time with a rhythmic accompaniment that gradually speeds up, 28 children aged 11–14, 9 sessions: better pseudoword speed and text accuracy than untrained controls. **Cancer et al. 2020** (NCT02791841): RRT vs another active programme, both improved, RRT better on pseudoword speed. **Habib et al. 2016** (*Front. Psychol.*): Cognitivo-Musical Training, French children with severe dyslexia, gains in reading, phonological awareness and auditory attention, held at 6-week follow-up. **Bhide, Power & Goswami 2013**: rhythm vs letter-sound training, 19 English poor readers, comparable gains. **Thomson, Leong & Goswami 2013**: rhythm training helped phonological awareness and spelling, not reading. **Gutiérrez-Palma et al. 2026** (*Learning and Instruction*, Spain, 131 randomised first-graders, 29 with reading difficulties): rhythm training helped word reading through phonological awareness. **Reviews:** Standley 2008 meta-analysis d=.32 on reading, **d=.44 when the music activity included reading**; Gordon et al. 2015 meta-analysis d=.20 on phonological awareness, no transfer to fluency; Cancer & Antonietti 2022 (*Heliyon*) review of 18 studies: effect on reading positive but not consistent; **the most effective forms were music training and music or auditory training combined with reading activities**, while auditory training alone did not transfer to reading. Descamps et al. 2025 (Mila-Learn, 151 children): primary outcome null, per-protocol word-reading gains (exploratory). Theory: Goswami's temporal sampling | Moderate and consistent in direction across several countries; small samples; **never tested in Arabic**. Our design (reading words on a beat) is one of the forms the 2022 review found most effective | "Built on rhythm-based reading training that improved reading in Italian, French and British studies; reading is placed inside the rhythm, the form reviews find works best." Don't say rhythm games are proven, and don't cite Mila-Learn as proof |
-| **Repeated reading, targeted text** (Story Recall) | **Repeated reading** (reading the same passage several times): Therrien 2004 meta-analysis (full text, Table 3 and results): rereading the same passage, fluency .83 and comprehension .67; new passages .50 and .25; all studies combined .64 and .42; students with learning disabilities on the same passage .75 and .73 (4 effect sizes each). Lee & Yoon 2017 meta-analysis of 34 studies of students with reading disabilities: random-effects pre-to-post fluency gain g=1.41 (fixed-effect 0.59), not a comparison with a control group. Cautions: Chard et al. 2009 found the base too small for "evidence-based" status; the What Works Clearinghouse (2014) found no discernible fluency effect for students with learning disabilities, but potentially positive effects on comprehension; one randomised Arabic study (44 third and fourth graders, peer-mediated) found no fluency gain, only on nonwords. **Text built around taught patterns** (decodable text): plausible and widely used, but few direct studies | Moderate internationally, weak in Arabic. Personalising the text to the reader's mistakes is our design, not a tested method | "Uses repeated reading, one of the most studied ways to build fluency, on a text built from the reader's own mistakes." Don't claim the LLM personalisation is proven |
-| **Reading aloud with feedback** (Word Flash) | Speech-recognition reading tutors (Project LISTEN). For Read Along, Google reports fluency gains (35–85% for slow starters after 100 minutes) from its own data and an Indian evaluation by Sattva, which compared users with a non-random comparison group. **No RCT and no Arabic evaluation found** | Moderate internationally | "Immediate, sound-level feedback on reading aloud" |
-| **Precise feedback** (every activity, AI coach) | **Wisniewski, Zierer & Hattie 2020** (*Frontiers in Psychology*), meta-analysis of 435 studies: feedback has a medium effect on learning (d=0.48), with wide variation; high-information feedback had d=0.99, simple corrective feedback 0.46, rewards or punishment 0.24 (full text, Table 2). The often-quoted d=0.79 (Hattie & Timperley 2007) is an older synthesis and overstates it | Strong in education generally; **not specific to dyslexia or Arabic** | "Feedback that says exactly what went wrong is one of the best-supported teaching practices." The coach's own effect is not measured |
-| **Adaptive practice** (knowledge tracing, all activities) | Bayesian Knowledge Tracing (Corbett & Anderson 1995) estimates mastery of each skill from right and wrong answers and has been used in intelligent tutors for decades. It is a modelling method, not an intervention with an effect size | Established technique | "Practice adapts to the sounds the reader finds hard." No claim about its effect on reading |
-| **Progress screen** | Shows accuracy, speed and error types over time for the reader, teachers and parents | No effect claimed | "Lets a teacher see which errors persist" |
-| **Fluency practice with brief display** (Word Flash) | Automaticity/fluency training (international). **Reading Acceleration Program** (Breznitz; Horowitz-Kraus et al. 2014, *Annals of Dyslexia*): text erased at the reader's own fastest pace and then faster, 89 Hebrew- and English-speaking children with reading difficulties in two trained groups and a waiting list, 4 weeks: the trained groups improved in silent reading speed, comprehension and speed of processing against their own pre-test. Against the waiting list, the Hebrew-speaking trained children read faster and more accurately and scored higher in comprehension after training; the English-speaking group gained less (full text read). A 2025 meta-analysis of digital interventions for poor readers (41 studies, 2000–2022, mostly alphabetic languages) reports g≈0.42 (**unverified**, abstract only) | Moderate | — |
+The National Reading Panel meta-analysis found a large effect of phonemic awareness instruction on phonemic awareness
+(d = 0.86) and a moderate effect on reading (d = 0.53). Programmes that taught one or two kinds of sound manipulation
+did better than those teaching three or more, and programmes that had children manipulate sounds with letters did
+best (Ehri et al. 2001; NICHD 2000). Sound Surgery uses two manipulations, deletion and substitution, on the written
+word.
 
-**Newer Arabic studies (2018–2026), searched 15 Nov:** no Arabic reading-intervention meta-analysis and no large or app-based Arabic RCT found. Only small studies, none above the bar for the pitch: a UAE quasi-experiment using ChatGPT for comprehension (n=60, journal not confirmed), a Saudi text-to-speech PhD study (11 girls), and a Saudi game-app PhD thesis. A 2025 systematic review covers Arabic *screening* tools, not interventions. **This gap is a pitch point:** Arabic dyslexia practice tools are under-tested, and our pilot logs the data needed for a proper trial.
+Arabic studies are small but point the same way. In Layes et al. (2019), 20 Algerian children with dyslexia who had
+phonological training outperformed a control group of 20 in word and pseudoword reading and phonological processing.
+Al Farsi and Imam (2017) randomly assigned 14 Omani children with reading disabilities and found gains in
+phonological awareness and decoding.
 
-Sources: [Layes et al. 2015 (Bellaterra, PDF)](https://ddd.uab.cat/pub/jtl3/jtl3_a2015m11-12v8n4/jtl3_a2015v8n4p24.pdf) · [Layes et al. 2019 (HAL)](https://hal.univ-lorraine.fr/hal-03220047) · [Layes et al. 2020, combined PA + print (publisher)](https://www.tandfonline.com/doi/abs/10.1080/1034912X.2020.1779914) · [Same (HAL)](https://hal.univ-lorraine.fr/hal-03220053) · [Morphological training, Grade 3 (JISNE 2021)](https://jisne.kglmeridian.com/view/journals/spne/24/2/article-p66.xml) · [Same, Arabic version (El-Oued repository)](https://dspace.univ-eloued.dz/handle/123456789/16557) · [Al Farsi & Imam 2017 (DOAJ)](https://doaj.org/article/7855661cc8404deab0d47492e9fee2be) · [Asadi 2017, vowelised but not necessarily easy](https://cris.haifa.ac.il/en/publications/reading-arabic-with-the-diacritics-for-short-vowels-vowelised-but/) · [Al-Balushi et al. 2020, diacritics and rapid naming](https://journals.qu.edu.qa/index.php/jes/article/view/1747) · [Partial diacritization (ElNokrashy & AlKhamissi 2024)](https://arxiv.org/abs/2401.08919) · [Flaugnacco et al. 2015 (PMC)](https://pmc.ncbi.nlm.nih.gov/articles/PMC4583182) · [Bonacina et al. 2015 RRT (PMC)](https://pmc.ncbi.nlm.nih.gov/articles/PMC4593943) · [Cancer et al. 2020 RRT](https://www.frontiersin.org/articles/10.3389/fpsyg.2020.01158) · [Descamps et al. 2025, Mila-Learn RCT (PMC)](https://pmc.ncbi.nlm.nih.gov/articles/PMC12095514) · [Read Along Arabic launch, Google MENA blog](https://blog.google/intl/en-mena/product-updates/android-chrome-and-play/read-along-google/) · [Sattva Read Along evaluation](https://www.sattva.co.in/wp-content/uploads/2020/09/Sattva_Google_Read-Along-IA-Report.pdf) · [National Reading Panel report, ch. 2 (NICHD PDF)](https://www.nichd.nih.gov/sites/default/files/publications/pubs/nrp/Documents/ch2-I.pdf) · [Lee & Yoon 2017 repeated reading meta-analysis (ASHA evidence map)](https://apps.asha.org/EvidenceMaps/Articles/ArticleSummary/c88f557d-4711-4446-a568-49c8bf8c881f) · [Therrien 2004 (ASHA evidence map)](https://apps.asha.org/EvidenceMaps/Articles/ArticleSummary/903ec865-92fd-4ca5-9cea-8534b161420a) · [Chard et al. 2009 (ASHA evidence map)](https://apps.asha.org/EvidenceMaps/Articles/ArticleSummary/ff2ddb70-cd15-4587-8385-29f7b0196183) · [Arabic peer-mediated repeated reading (Iowa dissertation)](https://iro.uiowa.edu/esploro/outputs/doctoral/The-effects-of-peer-mediated-repeated-reading/9983779599802771) · [Gordon, Fehd & McCandliss 2015 meta-analysis (Frontiers)](https://www.frontiersin.org/articles/10.3389/fpsyg.2015.01777/full) · [Cancer & Antonietti 2022 review (PMC)](https://pmc.ncbi.nlm.nih.gov/articles/PMC9048091/) · [Habib et al. 2016 (Frontiers)](https://www.frontiersin.org/articles/10.3389/fpsyg.2016.00026/full) · [Thomson, Leong & Goswami 2013 (PMC)](https://pmc.ncbi.nlm.nih.gov/articles/PMC3969307) · [Gutiérrez-Palma et al. 2026 (Granada repository)](https://digibug.ugr.es/handle/10481/108859) · [Reading Acceleration Program, Hebrew and English children (Haifa)](https://cris.haifa.ac.il/en/publications/reading-improvement-in-english-and-hebrew-speaking-children-with-/) · [Digital interventions meta-analysis 2025](https://link.springer.com/article/10.1007/s41465-025-00336-2) · [Arabic screening tools review 2025](https://www.sciencedirect.com/science/article/pii/S2666374025001050) · [Wisniewski, Zierer & Hattie 2020, feedback meta-analysis (PMC)](https://pmc.ncbi.nlm.nih.gov/articles/PMC6987456) · [Phonemic awareness instruction with letters (Reading Rockets, NRP summary)](https://www.readingrockets.org/topics/phonological-and-phonemic-awareness/articles/phonemic-awareness-instruction)
+### Word Flash (reading at a brief display)
 
----
+In the Reading Acceleration Program, text disappears at the reader's own fastest pace. In 89 Hebrew- and
+English-speaking children with reading difficulties, the trained groups improved in silent reading speed,
+comprehension and speed of processing after four weeks. The Hebrew-speaking trained group also read faster and more
+accurately and understood more than its waiting list; the English-speaking group gained less (Horowitz-Kraus et al.
+2014).
 
-## 3. Competitors
+### Rhythmic Reading
 
-| Product | What it does | Gap we fill |
+In a randomised trial with 46 Italian children with dyslexia, 30 weeks of rhythm-based music classes gave larger gains
+in pseudoword reading accuracy, verbal working memory and auditory attention than painting classes, with no difference
+in reading speed (Flaugnacco et al. 2015). Rhythmic Reading Training, a computer program in which children read
+syllables and words on screen in time with a rhythm that gradually speeds up, improved pseudoword reading speed
+(Bonacina et al. 2015; Cancer et al. 2020). A review of 18 studies found music training, and music or auditory
+training combined with reading, the most effective forms; auditory training alone did not carry over to reading
+(Cancer & Antonietti 2022). The samples are small and none of the studies is in Arabic.
+
+### My Story (repeated reading)
+
+Rereading the same passage improved fluency (0.83) and comprehension (0.67) in a meta-analysis; on new passages the
+effects were 0.50 and 0.25. Three readings gave a larger fluency effect than two (0.85 against 0.57), and the author
+recommends three to four (Therrien 2004). For students with reading disabilities, the pre-to-post fluency gain was
+g = 1.41, without a control group (Lee & Yoon 2017).
+
+The evidence has limits. Chard et al. (2009) judged the research base too small to call repeated reading
+evidence-based for students with learning disabilities, the What Works Clearinghouse (2014) found no discernible
+effect on their fluency, and a randomised Arabic study of 44 children found no fluency gain (Almotoe 2019). Building
+the story from the child's own mistakes is our design, not a tested method.
+
+### Feedback and the reading coach
+
+A meta-analysis of 435 studies found a medium effect of feedback on learning (d = 0.48). Feedback that says what went
+wrong and how to improve had the largest effect (d = 0.99), against 0.46 for simple right-or-wrong feedback
+(Wisniewski et al. 2020). The app names the sound that went wrong and what it heard instead. The coach, a language
+model, only explains a result the scorer has already decided; its own effect has not been measured.
+
+### Adaptive practice
+
+Bayesian Knowledge Tracing estimates mastery of each skill from right and wrong answers and is widely used in
+tutoring systems (Corbett & Anderson 1995). It is a modelling method, so we make no claim about its effect on reading.
+
+## 3. Existing tools
+
+| Tool | What it does | Difference |
 |---|---|---|
-| **Google Read Along (Arabic since Sept 2020)** | Free; listens to children read Arabic stories; speech processed on the device; reading buddy "Diya". Google's product marketing manager said it is "permissive and leaning more towards accepting a pronunciation" (Khaleej Times, 2020). **Still active in 2026:** since June 2026 it is free inside Google Classroom for all education users, with an Arabic library; the Android app's Play listing still resolves | General reading, not dyslexia-specific. Accept-leaning scoring hides exactly the errors dyslexic readers need feedback on (harakat, dot-letters). No error profile, no morphology, no rhythm, no adaptive vowel marks. No independent Arabic evaluation |
-| **Mila-Learn** (France) | Rhythm games for ages 7–14; one large RCT (primary outcome null, per-protocol word-reading gains); tapping, clapping, singing | French; never listens to reading |
-| **Sinbad and Jasmin** (KISR + KDA, Kuwait, 2019) | Adaptive short-term memory training app; no published outcomes | No reading, no speech |
-| **Amal** | Learn-to-read Arabic app with speech recognition and a "speech therapy" track (vendor claim, app store only) | General literacy, not dyslexia error patterns |
-| **Lamsa, AlifBee** | Broad early-learning platforms | No speech scoring, not dyslexia-focused |
-| Screening tools: SARD (Zayed University, UAE), ArabLexify (student project) | Screen for Arabic reading difficulties | Screening ≠ practice; we must not claim to screen or diagnose |
+| Google Read Along | Listens to children read Arabic stories and gives feedback; deliberately "permissive", leaning towards accepting a pronunciation (Khaleej Times 2020) | General reading, not dyslexia. Accepting near misses hides the errors that matter here (short vowels, dots) |
+| Mila-Learn (France) | Rhythm games for dyslexia | French; does not listen to reading |
+| Sinbad and Jasmin (Kuwait, 2019) | Adaptive short-term memory training | No reading or speech; no published outcomes |
+| Screening tools (e.g. SARD, UAE) | Screen for reading difficulties | Screening, not practice |
 
-No Gulf or Kuwaiti Arabic dyslexia app that scores reading aloud was found (searched in English and Arabic, 15 Nov).
+We found no Arabic dyslexia app that scores reading aloud sound by sound.
 
-**Our angle in one sentence for judges:** *Read Along accepts; we notice.* Precise, kind feedback on the errors that define Arabic dyslexia, plus practice that adapts to them, built on Arabic reading research.
+## 4. Adult pilot
 
-Sources: [Read Along "permissive" quote (Khaleej Times, Sept 2020)](https://www.khaleejtimes.com/tech/free-google-app-aims-to-help-kids-improve-their-arabic-reading-skills?amp=1) · [Read Along Arabic launch (Google MENA blog)](https://blog.google/intl/en-mena/product-updates/android-chrome-and-play/read-along-google/) · [Read Along in Classroom, June 2026 (Google Workspace Updates)](https://workspaceupdates.googleblog.com/2026/06/read-along-in-google-classroom-is-now-available-to-all-education-users-to-support-foundational-literacy.html) · [Read Along on Google Play](https://play.google.com/store/apps/details?id=com.google.android.apps.seekh) · [Arabic apps overview](https://kalimah-center.com/arabic-learning-apps-for-kids/) · [Amal listing](https://apps.apple.com/sa/app/id1517863038?l=ar-eg) · [Mila-Learn RCT (PMC)](https://pmc.ncbi.nlm.nih.gov/articles/PMC12095514) · [Mila-Learn usability study](https://pmc.ncbi.nlm.nih.gov/articles/PMC10811594/) · [SARD screener (Gulf News)](https://gulfnews.com/amp/uae/zayed-university-launches-new-online-learning-diagnostic-tool-1.95078074)
+Four consenting adults aged 18 to 24, speaking Kuwaiti, Qatari, Egyptian and Libyan Arabic, each read 24 cards
+(`ml/pilot_items.csv`) on their own phones: 8 words as written and 16 with a planted error, 96 recordings in all. A
+listener wrote down what each reader actually said, and `ml/pilot.py` compared the app's verdict with that.
 
----
-
-## 4. Technology for Arabic
-
-| Need | Options found | Recommendation |
-|---|---|---|
-| **Target text → phonemes** | espeak-ng Arabic: measured 16.6% disagreement with Iqra'Eval's expert labels (wrong on hamzat al-wasl, sun letters, shadda on و/ي, pausal forms). Iqra'Eval's **MSA phonetiser** (GitHub `Iqra-Eval/MSA_phonetiser`): **no licence file**, so legally "all rights reserved" | **Done:** our own converter, written from scratch in the Iqra'Eval symbol set (`ml/arabic_phonemes.py`): 0.6% disagreement with the labels (`ml/RESULTS.md`) |
-| **Audio → phonemes** | `wav2vec2-lv-60-espeak-cv-ft` (multilingual): measured **34.2%** phoneme error rate on held-out Arabic. **Iqra'Eval** publishes checkpoints (`IqraEval/Iqra_wav2vec2_base` etc., **Apache-2.0**; official baseline 11.8%, not a Hugging Face CTC model) and data (`Iqra_train`: Common Voice Arabic read MSA with vowelized text and phoneme labels, **CC BY-NC 4.0**). Shared-task winner AraS2P fine-tuned Wav2Vec2-BERT | **Done:** we fine-tuned `wav2vec2-lv-60-espeak-cv-ft` on `Iqra_train`: **9.75%** on all 79 h (3 h of training), better than the official baseline (`ml/RESULTS.md`). Non-commercial because of the data licence; a product would relabel Common Voice (CC0) with our converter |
-| **Vowel marks on generated text** (stories) | Mishkal, Rababa, pipeline-diacritizer, CATT (used by SILMA) | Our word lists are written vowelized by hand. Only LLM stories need a diacritizer, or an LLM asked for full tashkeel plus a check |
-| **Audio prompts** (Echo Chain, "hear the word") | **SILMA TTS** official: GitHub `SILMA-AI/silma-tts` (code **MIT**) and Hugging Face `silma-ai/silma-tts` (weights **Apache-2.0**, not gated); 150M parameters, Arabic + English, F5-TTS based. Other Hugging Face copies are unofficial mirrors. ArVoice dataset: diacritized MSA | Record the small fixed set (syllables, words) with a human voice; use SILMA TTS only for generated text, downloaded from the official repo |
-| **Speech data** | **Common Voice:** since Oct 2025 new releases come only from Mozilla Data Collective (account + terms of service); the clips stay **CC0**. Children's Arabic: **Arabic Little STT** (Levantine, 288 children aged 6–13, 355 utterances, CC BY 4.0); **Abjad-Kids** (46,397 clips of letters, numbers, colours, ages 3–12; dataset licence not stated in the paper); **ASMDD** (100 Egyptian children aged 2–8, 100 isolated words with mispronunciation labels; **no licence stated**) | None is a children's MSA read-aloud corpus with an open licence. For the adult pilot, use our own consented recordings; ask the authors before using ASMDD or Abjad-Kids |
-| **Accents and dialects** | Read Along is accent-permissive by design. Kuwaiti mappings: section 4.1 | Accept the regular dialect pronunciations in 4.1; still flag dot-letter and vowel errors |
-
-Sources: [Iqra'Eval models (Hugging Face API)](https://huggingface.co/api/models?author=IqraEval) · [Iqra'Eval datasets (Hugging Face API)](https://huggingface.co/api/datasets?author=IqraEval) · [Iqra-Eval GitHub repos](https://github.com/Iqra-Eval) · [Iqra'Eval shared task](https://iqraeval-sharedtask-arabicnlp2025.static.hf.space/index.html) · [Iqra'Eval paper (ArabicNLP 2025)](https://aclanthology.org/2025.arabicnlp-sharedtasks.61) · [AraS2P](https://arxiv.org/abs/2509.23504v1) · [wav2vec2-lv-60-espeak-cv-ft model card](https://huggingface.co/facebook/wav2vec2-lv-60-espeak-cv-ft) · [Mishkal](https://pypi.org/project/mishkal/0.1) · [Rababa](https://github.com/interscript/rababa) · [pipeline-diacritizer](https://github.com/hamza5/pipeline-diacritizer) · [SILMA TTS official code (GitHub)](https://github.com/SILMA-AI/silma-tts) · [SILMA TTS official weights (Hugging Face)](https://huggingface.co/silma-ai/silma-tts) · [ArVoice](https://arxiv.org/pdf/2505.20506v1) · [More data, fewer diacritics (QCRI)](https://arxiv.org/html/2603.01622) · [Common Voice moves to Mozilla Data Collective (Mozilla's HF README)](https://huggingface.co/spaces/mozilla-foundation/README/blob/main/README.md) · [Arabic Little STT](https://arxiv.org/abs/2510.23319) · [Abjad-Kids](https://arxiv.org/abs/2603.20255) · [ASMDD dataset](https://arxiv.org/pdf/2111.01136) · [Arabic speech correction tool for children](https://arxiv.org/pdf/2411.13592)
-
-### 4.1 Dialect tolerance (Kuwaiti Arabic reading MSA)
-
-Regular Kuwaiti realisations a scorer can accept as "dialect, not error". Main source: Al-Qenaie 2011, *Kuwaiti Arabic: A Socio-Phonological Perspective* (Durham PhD), sections 3.2 and 5.1. Speakers shift toward MSA in formal settings, so these appear *sometimes*, more in younger speakers.
-
-| MSA letter | MSA | Kuwaiti | When | Scoring rule |
-|---|---|---|---|---|
-| ق | `q` | `g` (most common); sometimes `dʒ` | Any position; `dʒ` mostly near front vowels (e.g. قِبلة → `dʒibla`) | Accept `g`. Accept `dʒ` for ق only, never for ج words |
-| ك | `k` | `tʃ` | Near front vowels; always in the feminine "your" ending ـكِ → `-itʃ` | Accept `tʃ` for ك |
-| ج | `dʒ` | `j` (y) | Unconditioned but socially marked; common in everyday words (e.g. جا → `jaː`, دجاج → `diyaːy`) | Accept `j` for ج |
-| ض | `dˤ` | `ðˤ` (merged with ظ) | Almost always | Accept `ðˤ` for ض. Note: this makes ض/ظ inseparable by ear, so don't score that pair as `dot_confusion` |
-| ث ، ذ | `θ` ، `ð` | **kept** as in MSA | — | No tolerance: `t`/`s` or `d`/`z` for these are errors in a Kuwaiti reader (unlike Levantine or Egyptian speakers) |
-| ـَيْ ، ـَوْ | `aj` ، `aw` | `eː` ، `oː` | Diphthongs | Accept the long monophthong |
-| ال | `al-` | `il-` | Definite article | Accept `il-` |
-
-**Caution:** no source tests these against children reading MSA aloud; a native Kuwaiti speaker should confirm the list before tuning. The rules cover Kuwaiti and broadly Gulf speech, not other dialects.
-
-Sources: [Al-Qenaie 2011, Durham thesis (record)](https://etheses.durham.ac.uk/id/eprint/935/) · [Same, full text PDF](https://etheses.durham.ac.uk/935/1/Shamlan_al-Qenaie.._Final_Draft_(PhD).pdf) · [Alqattan 2015, Kuwaiti Arabic phonological acquisition (Newcastle thesis)](https://theses.ncl.ac.uk/jspui/handle/10443/2787) · [Ayyad & Bernhardt 2009, Kuwaiti Arabic phonology in children](https://informahealthcare.com/doi/abs/10.3109/02699200903236493)
-
----
-
-## 5. Arabic error types
-
-Implemented in `backend/app/scoring.py` ([design.md](design.md) section 3):
-
-| `error_type` | Example | How we detect it |
-|---|---|---|
-| `dot_confusion` | ب read as ت (`b`→`t`), ج↔ح↔خ | A substitution between letters of the same dot-family (minus the dialect pairs in 4.1, e.g. ض/ظ) |
-| `vowel_error` | فَتَحَ read with a wrong short vowel | A substitution among short vowels `a i u` |
-| `vowel_length` | كاتِب read as كَتِب | Long ↔ short vowel (`aa`↔`a`) |
-| `letter_position` | Two letters swapped in order | An adjacent transposition in the phoneme sequence |
-| existing | `missing_sound`, `added_sound`, `substitution`, `no_response`, `none` | Unchanged |
-
----
-
-## 6. Design for Arabic dyslexic readers
-
-- **Spacing beats special fonts:** in the Arabolexia study (Benmarrakchi et al., *Int. J. Arabic-English Studies*, early view; 45 dyslexic children, mean age about 11), Arabolexia's advantage disappeared once a standard font (Simplified Arabic) got the same spacing. In Latin scripts, extra-large letter spacing doubled text-reading accuracy in Italian and French dyslexic children (Zorzi et al. 2012, *PNAS*). A Palestinian study argues spacing alone isn't enough and calls for distinctive letter design, so the question is open. **Do:** generous letter and word spacing, large size, high contrast, and a setting to adjust them.
-- **Dot and diacritic size:** no peer-reviewed study found. **Maqroo** (Omantel / Leo Burnett) enlarges dots and harakat by 200%: a designer claim, not a controlled study, but a cheap idea to offer as an option. Hejres & Tinker 2024 (*Societies*) list design considerations for an Arabic dyslexia-friendly typeface (a design analysis, not a reading test); the resulting Mubassat typeface is in a 2025 thesis.
-- Right-to-left layout throughout; short spoken instructions; never rely on colour alone.
-
-Sources: [Arabolexia study](https://ijaes2011.net/index.php/IJAES/article/view/827) · [Zorzi et al. 2012, letter spacing (PMC)](https://pmc.ncbi.nlm.nih.gov/articles/PMC3396504) · [Arabic digital font for dyslexia (Palestine Polytechnic)](https://scholar.ppu.edu/handle/123456789/9462) · [Maqroo font](https://Itsnicethat.com/articles/maqroo-leo-burnett-omantel-dubai-graphic-design-110424) · [Mubassat typeface thesis](https://pure.hud.ac.uk/en/studentTheses/mubassat/) · [Hejres & Tinker 2024, Societies](https://mdpi.com/2075-4698/14/4/45)
-
----
-
-## 7. Ethics checklist for the adult pilot
-
-Pilot = adults only, testing usability and scoring accuracy (not efficacy). Practical steps:
-
-1. **Information sheet + consent form** in Arabic and English: purpose, what is recorded, how long it is kept, who sees it, the right to stop at any time without giving a reason. Taking part is a separate ethical consent from any legal basis for processing the data.
-2. **Adults only, no vulnerable groups:** no minors and no one recruited through a dependency (the author's students or employees).
-3. **Collect the minimum:** a pseudonym ID, age band and dialect only; no names or civil IDs stored with recordings. Record only the reading tasks.
-4. **Recordings:** stored encrypted, outside git and outside the public repo, on a private drive; only the project author has access.
-5. **Retention:** delete raw audio when the evaluation is done (set a date, e.g. 31 Dec 2026); keep only scores and anonymised error counts. Delete a person's data on request.
-6. **No third-party processing** of audio beyond our own server; say so in the information sheet.
-7. **Wording:** "practice tool", never "test" or "diagnosis"; give no individual feedback that sounds clinical.
-8. **Kuwait law:** Kuwait has **no general personal data protection law**. CITRA's Data Privacy Protection Regulation (Decision 26 of 2024) covers licensed telecom/ICT service providers, a definition that can include apps; it requires information in Arabic and English, consent before collection, and deletion when consent is withdrawn. Following the steps above meets it. A university ethics committee review is needed only if a university runs the pilot (check with KDA).
-
-Sources: [UK ICO, research provisions: principles and lawful bases](https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/the-research-provisions/principles-and-grounds-for-processing/) · [GDPR Article 5 principles (EUR-Lex)](https://eur-lex.europa.eu/eli/reg/2016/679/oj) · [Kuwait data protection overview (DLA Piper)](https://www.dlapiperdataprotection.com/index.html?c=KW&t=law) · [CITRA Resolution 42/2021 (superseded in 2024, for reference)](https://www.citra.gov.kw/sites/en/LegalReferences/Resolution-No-42-On-Data-Privacy-Protection-Regulation.pdf)
-
----
-
-## 8. Kuwait Dyslexia Association (KDA)
-
-- **Official site / social media:** not found (searched English and Arabic, 15 Nov). `kda.org.kw` belongs to the Kuwait Dental Association, so don't link it.
-- **Founding:** founded 14 Dec 2005, registered as a public-benefit association in Feb 2006 (Al-Jarida, 2017); an old directory says 1999. Use 2005.
-- **Activity:** dyslexia-friendly schools project, assessment services, teacher training with Kuwait University; briefed the Minister of Social Affairs on its programmes in Oct 2026, with a conference coming up. Not the same as KALD (Kuwaiti Association for Learning Differences).
-- **Screening tools or statistics:** only the 2017 newspaper survey figures (section 1). No published screening tool found.
-- **The AI competition:** rules and the submission form are on the conference site (q8da.com, submit-paper page).
-
-Sources: [Al-Jarida 2017 (Arabic)](https://www.aljarida.com/articles/1485593604316030300) · [Kuwait Times, Oct 2026](https://kuwaittimes.com/article/51916/kuwait/social-affairs-minister-backs-support-for-people-with-learning-difficulties/)
-
----
-
-## 9. Adult pilot results (22 Nov 2026)
-
-Four consenting adults aged 18 to 24, speaking Kuwaiti, Qatari, Egyptian and Libyan Arabic, each read the 24 cards in
-`ml/pilot_items.csv` on their own phones: 8 words as written and 16 with a planted error, 96 recordings in all. I
-listened to the recordings, wrote down what each reader actually said, and scored the app against that with
-`ml/pilot.py`.
-
-Readers did not always make the planted error. Shown a near-word such as جِمَلْ, several read the real word جَمَل
+Readers did not always make the planted error: shown a near-word such as جِمَلْ, several read the real word جَمَل
 without noticing, and an Egyptian reader said ق as g. Labelled by what was said, 37 recordings were correct readings
 and 59 contained a real error.
 
 | Measure | Result |
 |---|---|
 | App's verdict matches the listener | 84% (81 of 96) |
-| Real errors caught | 83% (49 of 59, two of them by asking for another reading) |
+| Real errors caught | 83% (49 of 59) |
 | Correct readings marked right | 32 of 37 (3 asked to read again, 2 marked wrong) |
 | When the app says wrong, it is a real error | 91% |
 | Error type named as the listener would | 41% |
 
-All 10 missed errors were heard correctly by the speech model and then accepted by the fit check (design.md
-section 3). Nearly all are a single short vowel or vowel length: سَمِكْ for سَمَكْ, قُمَرْ for قَمَرْ, فِلْ for فِيلْ. At that
-level the model's own slips and a reader's real vowel slip look the same, so the weakness is the decision rule, not
-the recogniser. Asking for a second reading in that band is the next change to test. Letter swaps are caught but
-named as substitutions, which is most of the low type agreement; dot confusions are caught and named well. The two
-correct readings marked wrong had extra speech before the word. Several readers softened the final sukun or added a
-helper vowel before a final consonant pair; the app does not count either, by design.
+All 10 missed errors were transcribed correctly by the speech model and then accepted by the fit check
+([design.md](design.md), section 3). Nearly all were a single short vowel or vowel length, such as سَمِكْ for سَمَكْ.
+Asking for a second reading in that case is the next change to test. Swapped letters were caught but often named as
+substitutions, which explains most of the low type agreement.
 
-Limits: four adults and planted errors, labelled by one listener who knew the intended answer. No children and no
-readers with dyslexia. With 59 errors the true catch rate could plausibly be anywhere from about 72% to 91%.
+Limits: four adults, planted errors, and one listener who knew the intended answer. No children and no readers with
+dyslexia. With 59 errors, the true catch rate could plausibly be anywhere from about 72% to 91%.
 
----
+## 5. Pilot ethics
 
-## 10. Still open
+- Adults only, each with a signed consent form in Arabic and English ([pilot-consent.md](pilot-consent.md)).
+- Only a code, age band and dialect are stored; no names with recordings.
+- Recordings are processed on our own computer, never sent to an outside service, and never committed to this
+  repository. Raw audio is deleted by 31 December 2026; only scores and error counts are kept.
+- The app says "practice", never "test", and gives no clinical judgement.
 
-1. **Competition rules:** read on the conference site; ask the organisers for the judging criteria if they are not listed.
-2. **Dialect list (4.1):** a native Kuwaiti speaker checks it before scoring tolerates dialect pronunciations.
-3. **Pilot paperwork:** drafted in [pilot-consent.md](pilot-consent.md) (deletion by 31 Dec 2026); fill in the researcher's name and contact.
-4. **Kuwait prevalence:** only a 2017 newspaper figure exists. Ask KDA whether the survey was published; otherwise quote Aldakhil 2024 only.
-5. **Word lists:** grow them by letter family (dot pairs), syllable shape and root, from section 1.
-6. **Unverified, read before quoting:** the 2025 digital-intervention meta-analysis (g≈0.42), the UAE ChatGPT study, Amal's "speech therapy" claim.
+## 6. Display choices
+
+Extra letter spacing improved text reading in Italian and French children with dyslexia (Zorzi et al. 2012). The app
+uses large text, a clear naskh face, wide spacing and a right-to-left layout.
+
+## References
+
+- Aldakhil, A. F. (2024). Prevalence of developmental dyslexia among primary school children in Arab countries: A systematic review and meta-analysis. *Research in Developmental Disabilities, 152*, 104812.
+- Al Farsi, H. A., & Imam, M. M. (2017). Effectiveness of phonological awareness skills training in improving decoding skills of children with reading disabilities. *Journal of Educational and Psychological Studies, 11*(2), 315–336.
+- Almotoe, A. (2019). *The effects of peer-mediated repeated reading on reading fluency and comprehension for students with reading difficulties* [Doctoral dissertation, University of Iowa].
+- Bonacina, S., Cancer, A., Lanzi, P. L., Lorusso, M. L., & Antonietti, A. (2015). Improving reading skills in students with dyslexia: The efficacy of a sublexical training with rhythmic background. *Frontiers in Psychology, 6*, 1510.
+- Cancer, A., & Antonietti, A. (2022). Music-based and auditory-based interventions for reading difficulties: A literature review. *Heliyon, 8*(4), e09293.
+- Cancer, A., Bonacina, S., Antonietti, A., Salandi, A., Molteni, M., & Lorusso, M. L. (2020). The effectiveness of interventions for developmental dyslexia: Rhythmic reading training compared with hemisphere-specific stimulation and action video games. *Frontiers in Psychology, 11*, 1158.
+- Chard, D. J., Ketterlin-Geller, L. R., Baker, S. K., Doabler, C., & Apichatabutra, C. (2009). Repeated reading interventions for students with learning disabilities: Status of the evidence. *Exceptional Children, 75*(3), 263–281.
+- Corbett, A. T., & Anderson, J. R. (1995). Knowledge tracing: Modeling the acquisition of procedural knowledge. *User Modeling and User-Adapted Interaction, 4*(4), 253–278.
+- Ehri, L. C., Nunes, S. R., Willows, D. M., Schuster, B. V., Yaghoub-Zadeh, Z., & Shanahan, T. (2001). Phonemic awareness instruction helps children learn to read: Evidence from the National Reading Panel's meta-analysis. *Reading Research Quarterly, 36*(3), 250–287.
+- Flaugnacco, E., Lopez, L., Terribili, C., Montico, M., Zoia, S., & Schön, D. (2015). Music training increases phonological awareness and reading skills in developmental dyslexia: A randomized control trial. *PLoS ONE, 10*(9), e0138715.
+- Friedmann, N., & Haddad-Hanna, M. (2014). Types of developmental dyslexia in Arabic. In E. Saiegh-Haddad & R. M. Joshi (Eds.), *Handbook of Arabic literacy: Insights and perspectives* (pp. 119–151). Springer.
+- Horowitz-Kraus, T., Cicchino, N., Amiel, M., Holland, S. K., & Breznitz, Z. (2014). Reading improvement in English- and Hebrew-speaking children with reading difficulties after reading acceleration training. *Annals of Dyslexia, 64*(3), 183–201.
+- Khaleej Times. (2020, September 13). Free Google app aims to help kids improve their Arabic reading skills.
+- Layes, S., Lalonde, R., & Rebai, M. (2019). Effects of an adaptive phonological training program on reading and phonological processing skills in Arabic-speaking children with dyslexia. *Reading & Writing Quarterly, 35*(2), 103–117.
+- Lee, J., & Yoon, S. Y. (2017). The effects of repeated reading on reading fluency for students with reading disabilities: A meta-analysis. *Journal of Learning Disabilities, 50*(2), 213–224.
+- National Institute of Child Health and Human Development. (2000). *Report of the National Reading Panel. Teaching children to read* (NIH Publication No. 00-4769). U.S. Government Printing Office.
+- Saiegh-Haddad, E. (2018). MAWRID: A model of Arabic word reading in development. *Journal of Learning Disabilities, 51*(5), 454–462.
+- Therrien, W. J. (2004). Fluency and comprehension gains as a result of repeated reading: A meta-analysis. *Remedial and Special Education, 25*(4), 252–261.
+- What Works Clearinghouse. (2014, May). *Students with learning disabilities intervention report: Repeated reading*. U.S. Department of Education, Institute of Education Sciences.
+- Wisniewski, B., Zierer, K., & Hattie, J. (2020). The power of feedback revisited: A meta-analysis of educational feedback research. *Frontiers in Psychology, 10*, 3087.
+- Yassin, R., Share, D. L., & Shalhoub-Awwad, Y. (2020). Learning to spell in Arabic: The impact of script-specific visual-orthographic features. *Frontiers in Psychology, 11*, 2059.
+- Zorzi, M., Barbiero, C., Facoetti, A., Lonciari, I., Carrozzi, M., Montico, M., Bravar, L., George, F., Pech-Georgel, C., & Ziegler, J. C. (2012). Extra-large letter spacing improves reading in dyslexia. *Proceedings of the National Academy of Sciences, 109*(28), 11455–11459.

@@ -17,7 +17,7 @@ Results and the decisions behind them: [RESULTS.md](RESULTS.md).
 
 ## Setup (Windows, NVIDIA RTX 50xx)
 
-Blackwell GPUs need a CUDA 12.8+ PyTorch build. Python 3.12 (3.14 wheels were not needed, so not tried):
+Blackwell GPUs need a CUDA 12.8+ PyTorch build. Python 3.12:
 
 ```bash
 cd ml
@@ -56,11 +56,10 @@ git clone --depth 1 https://github.com/Iqra-Eval/interspeech_IqraEval data/src/i
 | [IqraEval/Iqra_wav2vec2_base](https://huggingface.co/IqraEval/Iqra_wav2vec2_base) | Apache-2.0 | baseline |
 | [facebook/wav2vec2-lv-60-espeak-cv-ft](https://huggingface.co/facebook/wav2vec2-lv-60-espeak-cv-ft) | Apache-2.0 | baseline + starting point |
 | [facebook/wav2vec2-base](https://huggingface.co/facebook/wav2vec2-base) | Apache-2.0 | frozen upstream of the Iqra'Eval baseline |
-| [Bisher/wav2vec2-xls-r-300m-IqraEval-3](https://huggingface.co/Bisher/wav2vec2-xls-r-300m-IqraEval-3) | none stated | tried as a baseline: outputs only blanks |
 | [Iqra-Eval/interspeech_IqraEval](https://github.com/Iqra-Eval/interspeech_IqraEval), [Iqra-Eval/MSA_phonetiser](https://github.com/Iqra-Eval/MSA_phonetiser) | **no licence file** | vocab file read at run time; phonetiser read for reference only, no code copied |
 
-**Non-commercial:** a model fine-tuned on Iqra_train inherits CC BY-NC 4.0 in practice. Fine for the hackathon
-and a research pilot; a paid product needs a commercial-friendly dataset (e.g. Common Voice Arabic itself, CC0,
+**Non-commercial:** a model fine-tuned on Iqra_train inherits CC BY-NC 4.0 in practice. Fine for research and this competition;
+a paid product needs a commercial-friendly dataset (e.g. Common Voice Arabic itself, CC0,
 labelled with `arabic_phonemes()` after diacritizing) — see RESULTS.md.
 
 ## Evaluate
@@ -102,7 +101,7 @@ by default: rename the new folder to that, or point `ARABIC_SPEECH_MODEL` at it.
 
 ## Adult pilot: agreement with a human listener
 
-Consenting adults only; follow the checklist in [docs/research.md](../docs/research.md) section 7 first. The
+Consenting adults only; see the ethics steps in [docs/research.md](../docs/research.md#5-pilot-ethics). The
 information sheet and consent form, in Arabic and English, are in [docs/pilot-consent.md](../docs/pilot-consent.md).
 
 1. **Items:** [pilot_items.csv](pilot_items.csv) has 24 cards: 8 read correctly and 16 with a deliberate error
@@ -126,4 +125,3 @@ information sheet and consent form, in Arabic and English, are in [docs/pilot-co
    ```
    It prints `verdict_agreement` (right/wrong matches the listener), `error_recall` (real mistakes caught),
    `error_precision` (flags that were real mistakes), `error_type_agreement` and a per-type breakdown.
-   These are the numbers for the pitch, together with the phoneme error rate.

@@ -40,7 +40,7 @@ Shapes live in [backend/app/schemas.py](../backend/app/schemas.py); the frontend
 | `GET /me`, `POST /logout` | Profile; end the login (logins last 30 days) |
 | `POST /score` | Score one answer (below) |
 | `POST /score-rhythm` | One recording of a Rhythmic Reading run → a result and a timing per word (section 3) |
-| `POST /timing-test` | Mic check (page `/mic-test`, not in the menu): every sound heard, its start time and the sounds written back as Arabic; with words, each word's result and timing; nothing saved |
+| `POST /timing-test` | Microphone check page (`/mic-test`): shows every sound heard and its timing; nothing saved |
 | `POST /next-exercise` | `{player_id, game, history}` → `{game, level, items, display_ms, reason}` |
 | `GET /story/status/{player_id}` | `{unlocked, attempts, needed}`: stories open after 20 word-game attempts |
 | `POST /story` | `{player_id, weak_sounds?, interests?}` → `{story, questions: [{q, answer}]}` |
@@ -78,9 +78,9 @@ that game, `503` model or LLM unavailable (the UI then falls back to the typed-a
 ### Arabic targets
 
 [backend/app/arabic_phonemes.py](../backend/app/arabic_phonemes.py) turns vowelized Modern Standard Arabic into
-the Iqra'Eval symbol set, the same converter the model was trained with (a test keeps the `ml/` and `backend/`
-copies identical). Consonants `b t ^ j H x d * r z s $ S D T Z E g f q k l m n h w y <` (`^` ث, `*` ذ, `$` ش,
-`E` ع, `g` غ, `<` hamza, capitals are emphatics); shadda doubles the symbol (`bb`); vowels `a i u`, long `aa ii uu`.
+the Iqra'Eval symbol set, the same converter the model was trained with. Consonants
+`b t ^ j H x d * r z s $ S D T Z E g f q k l m n h w y <` (`^` ث, `*` ذ, `$` ش, `E` ع, `g` غ, `<` hamza, capitals
+are emphatics); shadda doubles the symbol (`bb`); vowels `a i u`, long `aa ii uu`.
 
 - Targets must be fully vowelized. An unmarked letter yields only its consonant.
 - Sun letters, hamzat al-wasl and long vowels follow normal reading rules: الشَّمْسُ → `< a $$ a m s`.
@@ -109,11 +109,8 @@ changed (dot twin, another short vowel, a dropped consonant) as a simulated misr
 transcribed with a single slip passed and no misreading did. On 30 other dev recordings sent through `/score` as
 whole sentences, correct readings marked right rose from 8 to 17 (4 more were asked to read again) and none of the
 30 one-letter misreadings was accepted. The recordings are adults reading sentences. On single words in the adult
-pilot (research.md section 9) the check let through 10 real errors, nearly all one short vowel, that the model had
-transcribed correctly; asking for a second reading there is the next change to test.
-
-Check an item: `python -c "from app import g2p; print(g2p.phonemes('بَابْ'))"` from `backend/`
-(on Windows set `PYTHONIOENCODING=utf-8` first).
+pilot ([research.md](research.md#4-adult-pilot)) the check let through 10 real errors, nearly all one short vowel,
+that the model had transcribed correctly; asking for a second reading there is the next change to test.
 
 ### Error types
 
@@ -129,8 +126,7 @@ The two sequences are aligned with `difflib.SequenceMatcher`; the most specific 
 | `substitution` | | Anything else |
 | `none` / `no_response` | | Correct / nothing said |
 
-`phoneme_accuracy` is matched phonemes over the longer sequence. English targets still work (espeak-ng `en-gb`,
-plus `letter_reversal` for b/d and was/saw); they are a leftover from before the switch to Arabic.
+`phoneme_accuracy` is matched phonemes over the longer sequence.
 
 ### Rhythmic Reading
 
@@ -153,14 +149,17 @@ of the offsets: lower is steadier). Every word is saved as its own attempt. Type
 
 ## 5. Generated stories
 
-`/story` asks an LLM for a short story with questions, built from the player's weakest letters (BKT), the real words they misread lately in Word Flash and Rhythmic Reading, and their interests. Stories unlock after 20 word-game attempts (`GET /story/status/{player_id}`; `/story` returns `409` before that), so there is enough data to target. The reader reads the same story up to three times, sentence by sentence, and sees sound accuracy and time for each reading (repeated reading), then the questions. With
-`ANTHROPIC_API_KEY` set, the coach and stories use Claude (Opus 5.5 by default, `LLM_MODEL` to change it) through
-the Anthropic SDK, with structured JSON output, low effort for coach notes and medium for stories. Otherwise any
-OpenAI-compatible endpoint works (`VLLM_BASE_URL`, `VLLM_API_KEY`, `VLLM_MODEL` in `.env`; the names are
-historical). Each player gets at most 80 coach notes and 8 stories a day, and the site 2,000 LLM calls a day. The prompt is [content/prompts/story.txt](../content/prompts/story.txt).
+`/story` asks an LLM for a short story with questions, built from the player's weakest letters, the real words they
+misread lately in Word Flash and Rhythmic Reading, and their interests. Stories unlock after 20 word-game attempts
+(`/story` returns `409` before that), so there is enough data to target. The reader reads the same story up to three
+times, sentence by sentence, and sees sound accuracy and time for each reading, then answers the questions. The
+prompt is [content/prompts/story.txt](../content/prompts/story.txt).
 
-- It requests JSON-schema output and falls back to plain output, validated with Pydantic, when the server
-  doesn't support schemas.
+With `ANTHROPIC_API_KEY` set, the coach and stories use the Anthropic API (`LLM_MODEL` changes the
+model); otherwise any OpenAI-compatible endpoint works (`VLLM_BASE_URL`, `VLLM_API_KEY`, `VLLM_MODEL`). Each player
+gets at most 80 coach notes and 8 stories a day, and the whole site 1,000 coach notes and 100 stories.
+
+- Replies are structured JSON, validated before use.
 - A story is read aloud and scored, so it must be vowelized: if fewer than 90% of its letters carry a mark, the
   backend asks once more, then returns `503`.
 - To read a story, the frontend sends it to `/score` one sentence at a time.
@@ -179,12 +178,7 @@ fixed feedback first and adds the coach's note when it arrives, so a slow or mis
 - **Arabic:** our model, fine-tuned from `facebook/wav2vec2-lv-60-espeak-cv-ft` on Iqra'Eval data: 9.75% phoneme
   error rate on held-out Arabic speech. Loaded from `ARABIC_SPEECH_MODEL`, default `ml/models/arabic-phoneme`
   (1.2 GB, not in git; train it with [ml/README.md](../ml/README.md)). It loads in the background at startup.
-- **English:** `facebook/wav2vec2-lv-60-espeak-cv-ft`, downloaded on first use.
 - Audio is decoded with PyAV. Under 0.2 s counts as no answer. Runs on a CUDA GPU if PyTorch sees one, else CPU.
-- Install: `pip install torch` (CPU or CUDA build), then `pip install -r requirements-speech.txt` in `backend/`.
-
-To try a new model, measure it with `ml/evaluate.py`, then point `ARABIC_SPEECH_MODEL` at it. It must output the
-symbols in `SYMBOLS`; `ml/train.py` guarantees that.
 
 ## 7. Modes and content
 
@@ -192,27 +186,23 @@ symbols in `SYMBOLS`; `ml/train.py` guarantees that.
 - `MOCK_MODE=0` is the real pipeline. Without the speech packages audio returns `503`, but typed answers
   (`heard_text`) still go through scoring, progress and levels.
 - Every game has a debug mode (`?debug=1`): "said it right", "said it wrong" and a box for what was heard.
-- Frontend: one page per game under `frontend/src/games/`. Shared pieces in `frontend/src/shell/`: `useRound`
-  loads a round from `/next-exercise`, `useScorer` and `AnswerControls` handle the mic, the skip button, typed
-  answers, and the switch to typed answers when `/score` returns `503`.
+- Frontend: one folder per activity under `frontend/src/games/`, shared pieces (login, menu, microphone, answer
+  controls) in `frontend/src/shell/`.
 - Word lists: `content/<game>.json`, levels easiest first, at least 5 items each, read on every request:
 
 ```json
 { "levels": [ { "focus": "كَلِمَاتٌ قَصِيرَةٌ", "display_ms": 2000, "items": ["وَلَدْ", "قَمَرْ", "سَمَكْ", "مَلِكْ", "عَلَمْ"] } ] }
 ```
 
-- Sound Surgery items store prompt and answer as `"prompt|answer"`; `/score` gets the answer as `target`, and the
-  weak-sound targeting looks at the answer only. `backend/tests/test_content.py` checks every content file.
-- Game names stored with attempts: `word_flash`, `sound_surgery`, `rhythmic_reading`, `story_recall`.
-- `content/rhythmic_reading.json` uses `display_ms` as the slot per word: 3000 ms at level 1 down to 1600 ms.
+- Sound Surgery items are stored as `"prompt|answer"`. A test checks every content file.
 
 ## 8. Known limits
 
 - The model was trained on adults reading full MSA sentences. On single words read by four adults it matched a
-  human listener in 84% of recordings (research.md section 9). Children and readers with dyslexia are not measured yet.
-- No tolerance for dialect pronunciations yet (ق as `g`, ك as `tʃ`; in the pilot an Egyptian reader's ق as `g` was marked wrong): the symbol set has no `g`-for-ق, and the
-  list in research.md section 4.1 needs a native speaker's check first.
+  human listener in 84% of recordings. Children and readers with dyslexia are not measured yet.
+- No tolerance yet for dialect pronunciations such as ق said as `g` (in the pilot, an Egyptian reader's ق as `g`
+  was marked wrong).
 - Response time includes upload time; speech onset is not detected.
 - Spoken answers to story questions are not checked.
 - The training data is CC BY-NC 4.0, so the model is for non-commercial use.
-- Docker runs mock mode and typed answers; the image has no speech packages.
+- `docker compose` runs the backend only, in mock mode with typed answers; the root `Dockerfile` is the full image.
