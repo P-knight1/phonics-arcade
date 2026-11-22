@@ -2,19 +2,31 @@
 
     .venv/Scripts/python pilot_app/server.py        (from ml/)  then open http://localhost:8010
 
-Not part of the game. Listens on 127.0.0.1 only. Everything is written to ml/data/pilot/ (git-ignored):
+Not part of the game. Listens on 127.0.0.1 only; for participants' phones, put a tunnel in front of it
+(e.g. `tailscale funnel 8010`) and switch the tunnel off after the session. The recordings stay on this computer.
+
+Two codes, printed at start (new ones every start unless PILOT_CODE / PILOT_REVIEW_CODE are set):
+    session code    typed once on a phone to run cards; it cannot list, play or delete anyone's recordings
+    researcher code for the review page only (listen, correct `said`, delete); never enter it on a participant's phone
+
+Everything is written to ml/data/pilot/ (git-ignored):
     participants.csv   code, age band, dialect, date (no names: the signed forms stay on paper)
     p03_17.webm        participant p03, card 17 (the row in pilot_items.csv, from 1)
     clips.csv          path,target,said,... ready for `python pilot.py data/pilot/clips.csv`
 `said` starts as what the card asked for; correct it on the review page where a participant read it differently.
 """
 import csv
+import hmac
 import json
+import os
 import re
+import secrets
 import threading
+import time
 from datetime import date, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import parse_qs
 
 ML = Path(__file__).resolve().parents[1]
 DATA = ML / "data" / "pilot"
@@ -26,7 +38,11 @@ CLIP = re.compile(r"^(p\d{2})_(\d{1,2})\.webm$")
 CLIP_FIELDS = ["path", "target", "said", "asked", "error", "participant", "card", "recorded_at"]
 PEOPLE_FIELDS = ["code", "age_band", "dialect", "date"]
 AGE_BANDS = {"18–24", "25–34", "35–49", "50+"}
+SESSION_CODE = os.getenv("PILOT_CODE") or secrets.token_hex(4)
+REVIEW_CODE = os.getenv("PILOT_REVIEW_CODE") or secrets.token_hex(6)
+MAX_FAILS, LOCK_SECONDS = 20, 900  # wrong codes before everyone is locked out for 15 minutes
 lock = threading.Lock()  # one writer at a time for the CSV files
+fails = {"count": 0, "until": 0.0}
 
 with open(ML / "pilot_items.csv", encoding="utf-8") as f:
     ITEMS = list(csv.DictReader(f))
@@ -83,30 +99,61 @@ def delete_participant(code: str) -> int:
     return len([r for r in clips if r["participant"] == code])
 
 
+def allowed(given: str, needed: str) -> bool:
+    """Constant-time check; too many wrong codes lock everyone out for a while (the link may be public)."""
+    with lock:
+        if time.time() < fails["until"]:
+            return False
+        if hmac.compare_digest(given.encode(), needed.encode()):
+            return True
+        fails["count"] += 1
+        if fails["count"] >= MAX_FAILS:
+            fails.update(count=0, until=time.time() + LOCK_SECONDS)
+        return False
+
+
 class Handler(BaseHTTPRequestHandler):
+    def _code(self, query: dict) -> str:
+        return self.headers.get("X-Pilot-Code") or query.get("k", [""])[0]
+
     def do_GET(self):
-        path = self.path.split("?")[0]
+        path, _, raw = self.path.partition("?")
+        query = parse_qs(raw)
         if path == "/":
             return self._send(200, PAGE.read_bytes(), "text/html; charset=utf-8")
-        if path == "/api/state":
-            return self._json(200, {"items": ITEMS, "clips": read("clips.csv"), "participants": read("participants.csv")})
-        if path.startswith("/audio/") and CLIP.match(name := path[len("/audio/"):]) and (DATA / name).exists():
-            return self._send(200, (DATA / name).read_bytes(), "audio/webm")
+        if path in ("/api/items", "/api/done"):
+            if not allowed(self._code(query), SESSION_CODE):
+                return self._json(401, {"error": "code"})
+            if path == "/api/items":
+                return self._json(200, {"items": ITEMS})
+            code = query.get("code", [""])[0]  # only which cards this participant has done, nothing else
+            return self._json(200, {"done": [int(r["card"]) for r in read("clips.csv") if r["participant"] == code]})
+        if path == "/api/state" or path.startswith("/audio/"):
+            if not allowed(self._code(query), REVIEW_CODE):
+                return self._json(401, {"error": "code"})
+            if path == "/api/state":
+                return self._json(200, {"items": ITEMS, "clips": read("clips.csv"), "participants": read("participants.csv")})
+            name = path[len("/audio/"):]
+            if CLIP.match(name) and (DATA / name).exists():
+                return self._send(200, (DATA / name).read_bytes(), "audio/webm")
         self._json(404, {"error": "not found"})
 
     def do_POST(self):
-        path, _, query = self.path.partition("?")
+        path, _, raw = self.path.partition("?")
+        query = parse_qs(raw)
         length = int(self.headers.get("Content-Length", 0))
         if length > MAX_AUDIO:
             return self._json(413, {"error": "too large"})
+        needed = SESSION_CODE if path in ("/api/clip", "/api/participant") else REVIEW_CODE
+        if not allowed(self._code(query), needed):
+            return self._json(401, {"error": "code"})
         body = self.rfile.read(length)
         try:
             if path == "/api/clip":
-                args = dict(p.split("=", 1) for p in query.split("&") if "=" in p)
-                code, card = args.get("code", ""), int(args.get("card", 0))
+                code, card = query.get("code", [""])[0], int(query.get("card", ["0"])[0])
                 if not CODE.match(code) or not 1 <= card <= len(ITEMS) or len(body) < 1000:
                     return self._json(422, {"error": "bad code, card or empty recording"})
-                return self._json(200, save_clip(code, card, body))
+                return self._json(200, {"ok": True, "card": save_clip(code, card, body)["card"]})
             req = json.loads(body or b"{}")
             if path == "/api/participant":
                 code = req.get("code", "")
@@ -138,6 +185,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Robots-Tag", "noindex")
         self.end_headers()
         self.wfile.write(data)
 
@@ -146,5 +194,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    print(f"Pilot recorder on http://localhost:{PORT}  (clips go to {DATA})", flush=True)
+    print(f"Pilot recorder on http://localhost:{PORT}  (clips go to {DATA})")
+    print(f"  session code (type it on each phone):      {SESSION_CODE}")
+    print(f"  researcher code (review page, only yours): {REVIEW_CODE}", flush=True)
     ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()

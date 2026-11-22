@@ -36,15 +36,36 @@
 const $ = (html) => { const t = document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstChild; };
 const app = document.getElementById("app");
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
-let state = { items: [], clips: [], participants: [] };
+let items = [];
+let state = { clips: [], participants: [] };
 let stream = null;
 
-async function load() { state = await (await fetch("/api/state")).json(); }
-async function post(url, body, type = "application/json") {
-  const r = await fetch(url, { method: "POST", headers: { "Content-Type": type }, body: type === "application/json" ? JSON.stringify(body) : body });
+// Two codes from the server console: "session" runs cards on a phone, "review" opens the recordings (researcher only).
+const KEYS = { session: "pilot-session-code", review: "pilot-review-code" };
+const getCode = (kind) => { try { return sessionStorage.getItem(KEYS[kind]) || ""; } catch { return ""; } };
+const setCode = (kind, v) => { try { sessionStorage.setItem(KEYS[kind], v); } catch {} };
+class NeedCode extends Error {}
+
+async function api(kind, url, opts = {}) {
+  const r = await fetch(url, { ...opts, headers: { ...(opts.headers || {}), "X-Pilot-Code": getCode(kind) } });
+  if (r.status === 401) throw new NeedCode(kind);
   const data = await r.json(); if (!r.ok) throw new Error(data.error || r.status); return data;
 }
+const post = (kind, url, body, type = "application/json") =>
+  api(kind, url, { method: "POST", headers: { "Content-Type": type }, body: type === "application/json" ? JSON.stringify(body) : body });
 async function mic() { stream ??= await navigator.mediaDevices.getUserMedia({ audio: true }); return stream; }
+
+function codeScreen(kind) {
+  const title = kind === "review" ? "رمز الباحث" : "رمز الجلسة";
+  const hint = kind === "review" ? "للمراجعة فقط. لا تُدخله على هاتف المشارك." : "يكتبه الباحث مرة واحدة على هذا الجهاز.";
+  app.replaceChildren($(`<div><h1>${title}</h1><p class="muted">${hint}</p>
+    <div class="card"><label>الرمز <input id="pcode" dir="ltr" autocomplete="off" autocapitalize="off"></label>
+    <p id="err" class="error ${getCode(kind) ? "" : "hidden"}">الرمز غير صحيح، أو حاول بعد قليل.</p>
+    <button class="primary" id="ok">متابعة</button></div></div>`));
+  const go = () => { setCode(kind, document.getElementById("pcode").value.trim()); route(); };
+  document.getElementById("ok").onclick = go;
+  document.getElementById("pcode").onkeydown = (e) => e.key === "Enter" && go();
+}
 
 /** One recording: start() then stop() resolves with the clip. */
 function recorder() {
@@ -59,7 +80,7 @@ function recorder() {
 function order(code) {
   let seed = [...code].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
   const rand = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 2 ** 32);
-  const cards = state.items.map((_, i) => i + 1);
+  const cards = items.map((_, i) => i + 1);
   for (let i = cards.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [cards[i], cards[j]] = [cards[j], cards[i]]; }
   return cards;
 }
@@ -69,7 +90,7 @@ function start() {
     <h1>جلسة جديدة</h1>
     <p class="muted">لا تُكتب أسماء هنا. استمارة الموافقة الموقّعة تبقى ورقية لدى الباحث.</p>
     <div class="card">
-      <label>رمز المشارك <input id="code" placeholder="p01" dir="ltr"></label>
+      <label>رمز المشارك <input id="code" placeholder="p01" dir="ltr" autocapitalize="off"></label>
       <label>الفئة العمرية <select id="age"><option value="">اختر…</option><option>18–24</option><option>25–34</option><option>35–49</option><option>50+</option></select></label>
       <label>اللهجة <input id="dialect" placeholder="مثل: كويتية"></label>
       <label class="check"><input type="checkbox" id="consent"> المشارك بالغ ووقّع استمارة الموافقة</label>
@@ -89,24 +110,27 @@ function start() {
   document.getElementById("go").onclick = async () => {
     const code = document.getElementById("code").value.trim().toLowerCase();
     try {
-      await post("/api/participant", { code, age_band: document.getElementById("age").value,
+      await post("session", "/api/participant", { code, age_band: document.getElementById("age").value,
         dialect: document.getElementById("dialect").value, consent: document.getElementById("consent").checked });
-      await mic(); await load(); session(code);
-    } catch (e) { const err = document.getElementById("err"); err.textContent = "تحقّق من الرمز (مثل p01) والفئة العمرية والموافقة، واسمح بالميكروفون."; err.classList.remove("hidden"); }
+      await mic(); await session(code);
+    } catch (e) {
+      if (e instanceof NeedCode) return codeScreen("session");
+      const err = document.getElementById("err"); err.textContent = "تحقّق من الرمز (مثل p01) والفئة العمرية والموافقة، واسمح بالميكروفون."; err.classList.remove("hidden");
+    }
   };
 }
 
-function session(code) {
-  const done = new Set(state.clips.filter((c) => c.participant === code).map((c) => Number(c.card)));
+async function session(code) {
+  const done = new Set((await api("session", `/api/done?code=${encodeURIComponent(code)}`)).done);
   const cards = order(code).filter((c) => !done.has(c));
-  const total = state.items.length;
+  const total = items.length;
   let clip = null; const r = recorder();
   if (!cards.length) return finished(code);
-  const card = cards[0], item = state.items[card - 1], n = total - cards.length + 1;
+  const card = cards[0], item = items[card - 1], n = total - cards.length + 1;
   app.replaceChildren($(`<div>
-    <p class="muted">${code} · البطاقة ${n} من ${total}</p>
+    <p class="muted">${esc(code)} · البطاقة ${n} من ${total}</p>
     <div class="bar"><span style="width:${(n - 1) / total * 100}%"></span></div>
-    <div class="card"><p class="word">${item.said}</p></div>
+    <div class="card"><p class="word">${esc(item.said)}</p></div>
     <p class="muted">اقرأ الكلمة كما هي مكتوبة تمامًا، بصوت عادي. اترك ثانية صمت قبل الكلام وبعده.</p>
     <div class="row">
       <button class="primary" id="rec">● سجّل</button>
@@ -125,18 +149,20 @@ function session(code) {
   play.onclick = () => new Audio(URL.createObjectURL(clip)).play();
   save.onclick = async () => {
     save.disabled = true; note.textContent = "نحفظ…";
-    try { await post(`/api/clip?code=${code}&card=${card}`, clip, clip.type || "audio/webm"); await load(); session(code); }
+    try { await post("session", `/api/clip?code=${encodeURIComponent(code)}&card=${card}`, clip, clip.type || "audio/webm"); await session(code); }
     catch (e) { note.textContent = "لم يُحفظ: " + e.message + ". أعد التسجيل."; save.disabled = false; }
   };
 }
 
-function finished(code) {
-  app.replaceChildren($(`<div><h1>انتهت الجلسة</h1><p>سُجّلت البطاقات الـ ${state.items.length} للمشارك ${code}. شكرًا!</p>
-    <div class="row"><button class="primary" onclick="location.hash='#review'">مراجعة التسجيلات</button><button onclick="start()">جلسة جديدة</button></div></div>`));
+function finished(code) {  // no link to the review page here: this may be a participant's phone
+  app.replaceChildren($(`<div><h1>انتهت الجلسة</h1><p>سُجّلت البطاقات الـ ${items.length} للمشارك ${esc(code)}. شكرًا!</p>
+    <div class="row"><button class="primary" id="again">جلسة جديدة</button></div></div>`));
+  document.getElementById("again").onclick = start;
 }
 
 function review() {
   const byCode = Object.groupBy(state.clips, (c) => c.participant);
+  const k = encodeURIComponent(getCode("review"));
   const root = $(`<div><h1>مراجعة التسجيلات</h1>
     <p class="muted">استمع إلى كل تسجيل. إذا قرأ المشارك الكلمة بشكل مختلف عمّا طُلب، اكتب ما قاله فعلًا (مشكولًا) في خانة «قال». هذا هو حكم المستمع البشري الذي تُقارن به التطبيق.</p>
     <p class="muted">التحليل (من مجلد ml): <code dir="ltr">.venv/Scripts/python pilot.py data/pilot/clips.csv</code></p></div>`);
@@ -148,15 +174,15 @@ function review() {
       <table><thead><tr><th>#</th><th>الهدف</th><th>طُلب</th><th>التسجيل</th><th>قال</th></tr></thead><tbody></tbody></table></div>`);
     box.querySelector(".del").onclick = async () => {
       if (!confirm(`حذف كل تسجيلات ${code} وبياناته نهائيًا؟ لا يمكن التراجع.`)) return;
-      await post("/api/delete", { code }); await load(); review();
+      await post("review", "/api/delete", { code }); route();
     };
     const body = box.querySelector("tbody");
     for (const c of clips) {
       const name = c.path.split("/").pop();
       const tr = $(`<tr class="${c.said !== c.asked ? "changed" : ""}"><td>${esc(c.card)}</td><td class="ar">${esc(c.target)}</td><td class="ar">${esc(c.asked)}</td>
-        <td><audio controls preload="none" src="/audio/${esc(name)}"></audio></td><td><input value="${esc(c.said)}"></td></tr>`);
+        <td><audio controls preload="none" src="/audio/${esc(name)}?k=${k}"></audio></td><td><input value="${esc(c.said)}"></td></tr>`);
       tr.querySelector("input").onchange = async (e) => {
-        await post("/api/said", { path: c.path, said: e.target.value }); c.said = e.target.value.trim(); tr.className = c.said !== c.asked ? "changed" : "";
+        await post("review", "/api/said", { path: c.path, said: e.target.value }); c.said = e.target.value.trim(); tr.className = c.said !== c.asked ? "changed" : "";
       };
       body.append(tr);
     }
@@ -165,7 +191,17 @@ function review() {
   app.replaceChildren(root);
 }
 
-async function route() { await load(); location.hash === "#review" ? review() : start(); }
+async function route() {
+  const kind = location.hash === "#review" ? "review" : "session";
+  if (!getCode(kind)) return codeScreen(kind);
+  try {
+    if (kind === "review") { state = await api("review", "/api/state"); review(); }
+    else { items = (await api("session", "/api/items")).items; start(); }
+  } catch (e) {
+    if (e instanceof NeedCode) return codeScreen(kind);
+    app.replaceChildren($(`<p class="error">تعذّر الاتصال بالخادم. تأكد أنه يعمل ثم أعد تحميل الصفحة.</p>`));
+  }
+}
 addEventListener("hashchange", route);
 route();
 </script>
