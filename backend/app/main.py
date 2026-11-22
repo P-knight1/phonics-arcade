@@ -78,9 +78,8 @@ _hits_lock = threading.Lock()
 
 
 def client_ip(request: Request) -> str:
-    # Railway's proxy appends the caller's address last; earlier entries can be typed by the caller.
-    forwarded = request.headers.get("x-forwarded-for", "")
-    return forwarded.rsplit(",", 1)[-1].strip() or (request.client.host if request.client else "?")
+    # Railway's edge sets X-Real-IP to the caller; X-Forwarded-For ends in the edge's own, changing, address.
+    return request.headers.get("x-real-ip", "").strip() or (request.client.host if request.client else "?")
 
 
 def rate_limit(bucket: str, most: int, seconds: int):

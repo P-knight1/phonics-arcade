@@ -306,5 +306,5 @@ def test_login_attempts_are_limited_per_address(client):
     for _ in range(10):
         assert client.post("/login", json={"name": "nobody", "password": "wrong-password"}).status_code == 401
     assert client.post("/login", json={"name": "nobody", "password": "wrong-password"}).status_code == 429
-    other = {"X-Forwarded-For": "203.0.113.9"}  # another caller is not blocked
+    other = {"X-Real-IP": "203.0.113.9"}  # another caller is not blocked
     assert client.post("/login", json={"name": "nobody", "password": "wrong-password"}, headers=other).status_code == 401
