@@ -39,8 +39,12 @@ Shapes live in [backend/app/schemas.py](../backend/app/schemas.py); the frontend
 | `POST /guest` | Play without an account; data deleted on `/logout` or after 24 h |
 | `GET /me`, `POST /logout` | Profile; end the login (logins last 30 days) |
 | `POST /score` | Score one answer (below) |
+| `POST /score-rhythm` | One recording of a Rhythmic Reading run → a result and a timing per word (section 3) |
+| `POST /timing-test` | Mic check (page `/mic-test`, not in the menu): every sound heard, its start time and the sounds written back as Arabic; with words, each word's result and timing; nothing saved |
 | `POST /next-exercise` | `{player_id, game, history}` → `{game, level, items, display_ms, reason}` |
+| `GET /story/status/{player_id}` | `{unlocked, attempts, needed}`: stories open after 20 word-game attempts |
 | `POST /story` | `{player_id, weak_sounds?, interests?}` → `{story, questions: [{q, answer}]}` |
+| `POST /coach` | `{player_id, kind: "word" \| "round", attempts}` → `{text}`: the reading coach (section 5) |
 | `GET /progress/{player_id}?game=` | One entry per day: word accuracy, phoneme accuracy, average response time, error counts |
 | `GET /health` | `{ok, mock}` |
 
@@ -82,6 +86,31 @@ copies identical). Consonants `b t ^ j H x d * r z s $ S D T Z E g f q k l m n h
 - Sun letters, hamzat al-wasl and long vowels follow normal reading rules: الشَّمْسُ → `< a $$ a m s`.
 - The last word is read in pause: كِتَابٌ → `k i t aa b`. Reading the final vowel or tanwin in full is also
   correct Arabic, so `scoring` accepts it too.
+- A word ending in two consonants (حَبْلْ) is often said with a short vowel slipped between them (حَبِل). That is
+  how the cluster is pronounced, not a misreading, so `scoring` accepts it.
+
+### Close calls: does the recording fit the word?
+
+The model gets about one sound in ten wrong, so a word of four or five sounds read perfectly would still be
+marked wrong roughly a third of the time if the transcript had to match exactly. For Arabic audio,
+`speech.recognize_fit` therefore also asks how well the recording fits the word the reader was asked to say: the
+CTC likelihood of the target against that of the model's own transcript (goodness of pronunciation, Witt and
+Young 2000). The difference, the gap, is in nats; 0 means the target is as likely as the transcript.
+
+| Gap | Verdict | Why |
+|---|---|---|
+| up to 3 | right | the transcript's difference is the model's slip |
+| 3 to 6 | "read it again" (`unclear`), nothing saved | slips and some real misreadings (mostly vowels) overlap here |
+| over 6 | the normal error type | a real misreading |
+
+The second reading of a word always gets a verdict (`second_try`), so a reader is never stuck. The thresholds come
+from 300 Iqra'Eval dev recordings with each label's true reading as the target, and the same label with one sound
+changed (dot twin, another short vowel, a dropped consonant) as a simulated misreading. At 3, 83% of right readings
+transcribed with a single slip passed and no misreading did. On 30 other dev recordings sent through `/score` as
+whole sentences, correct readings marked right rose from 8 to 17 (4 more were asked to read again) and none of the
+30 one-letter misreadings was accepted. The recordings are adults reading sentences. On single words in the adult
+pilot (research.md section 9) the check let through 10 real errors, nearly all one short vowel, that the model had
+transcribed correctly; asking for a second reading there is the next change to test.
 
 Check an item: `python -c "from app import g2p; print(g2p.phonemes('بَابْ'))"` from `backend/`
 (on Windows set `PYTHONIOENCODING=utf-8` first).
@@ -103,6 +132,16 @@ The two sequences are aligned with `difflib.SequenceMatcher`; the most specific 
 `phoneme_accuracy` is matched phonemes over the longer sequence. English targets still work (espeak-ng `en-gb`,
 plus `letter_reversal` for b/d and was/saw); they are a leftover from before the switch to Arabic.
 
+### Rhythmic Reading
+
+One recording covers the whole run: a 4-beat count-in, then one word every two beats (the word shows on the first
+beat). `/score-rhythm` takes the words, the slot length and when the first word appeared. `speech.recognize_timed`
+returns each phoneme with the time it started (CTC frames are 20 ms). `rhythm.py` aligns the whole run against all
+the words at once and gives each heard sound to a word, so a missed word doesn't shift the others and an extra final
+vowel stays with its word. Each word is then scored like `/score`, plus `offset_ms` (from the word appearing to the
+reader starting it), `on_time` (started before the next word appeared), and `steadiness_ms` for the run (the spread
+of the offsets: lower is steadier). Every word is saved as its own attempt. Typed answers give no timing.
+
 ## 4. Adaptive practice (`brain.py`)
 
 - **Mastery per sound:** Bayesian Knowledge Tracing (Corbett & Anderson 1995), replayed over the player's saved
@@ -114,15 +153,26 @@ plus `letter_reversal` for b/d and was/saw); they are a leftover from before the
 
 ## 5. Generated stories
 
-`/story` asks an LLM for a short story with questions, using the player's weak letters and interests. Any
+`/story` asks an LLM for a short story with questions, built from the player's weakest letters (BKT), the real words they misread lately in Word Flash and Rhythmic Reading, and their interests. Stories unlock after 20 word-game attempts (`GET /story/status/{player_id}`; `/story` returns `409` before that), so there is enough data to target. The reader reads the same story up to three times, sentence by sentence, and sees sound accuracy and time for each reading (repeated reading), then the questions. With
+`ANTHROPIC_API_KEY` set, the coach and stories use Claude (Opus 5.5 by default, `LLM_MODEL` to change it) through
+the Anthropic SDK, with structured JSON output, low effort for coach notes and medium for stories. Otherwise any
 OpenAI-compatible endpoint works (`VLLM_BASE_URL`, `VLLM_API_KEY`, `VLLM_MODEL` in `.env`; the names are
-historical). The prompt is [content/prompts/story.txt](../content/prompts/story.txt).
+historical). Each player gets at most 80 coach notes and 8 stories a day, and the site 2,000 LLM calls a day. The prompt is [content/prompts/story.txt](../content/prompts/story.txt).
 
 - It requests JSON-schema output and falls back to plain output, validated with Pydantic, when the server
   doesn't support schemas.
 - A story is read aloud and scored, so it must be vowelized: if fewer than 90% of its letters carry a mark, the
   backend asks once more, then returns `503`.
 - To read a story, the frontend sends it to `/score` one sentence at a time.
+
+### Reading coach
+
+`/coach` asks the same LLM to explain a mistake (`word`) or sum up a round (`round`) in one to three kind
+sentences. The LLM never hears audio and never decides right or wrong: the backend rewrites each scored attempt as
+letters (`حَبْلْ: قُرئ ح كأنه ج`), adds the player's weak letters, and fills
+[content/prompts/coach_word.txt](../content/prompts/coach_word.txt) or `coach_round.txt`. A reply must be Arabic,
+short (300 or 600 characters) and free of clinical words, or the request returns `503`. The frontend shows its
+fixed feedback first and adds the coach's note when it arrives, so a slow or missing LLM changes nothing.
 
 ## 6. Speech model (`speech.py`)
 
@@ -142,19 +192,25 @@ symbols in `SYMBOLS`; `ml/train.py` guarantees that.
 - `MOCK_MODE=0` is the real pipeline. Without the speech packages audio returns `503`, but typed answers
   (`heard_text`) still go through scoring, progress and levels.
 - Every game has a debug mode (`?debug=1`): "said it right", "said it wrong" and a box for what was heard.
+- Frontend: one page per game under `frontend/src/games/`. Shared pieces in `frontend/src/shell/`: `useRound`
+  loads a round from `/next-exercise`, `useScorer` and `AnswerControls` handle the mic, the skip button, typed
+  answers, and the switch to typed answers when `/score` returns `503`.
 - Word lists: `content/<game>.json`, levels easiest first, at least 5 items each, read on every request:
 
 ```json
 { "levels": [ { "focus": "كَلِمَاتٌ قَصِيرَةٌ", "display_ms": 2000, "items": ["وَلَدْ", "قَمَرْ", "سَمَكْ", "مَلِكْ", "عَلَمْ"] } ] }
 ```
 
-- Sound Surgery items store prompt and answer as `"prompt|answer"`; `/score` gets the answer as `target`.
+- Sound Surgery items store prompt and answer as `"prompt|answer"`; `/score` gets the answer as `target`, and the
+  weak-sound targeting looks at the answer only. `backend/tests/test_content.py` checks every content file.
+- Game names stored with attempts: `word_flash`, `sound_surgery`, `rhythmic_reading`, `story_recall`.
+- `content/rhythmic_reading.json` uses `display_ms` as the slot per word: 3000 ms at level 1 down to 1600 ms.
 
 ## 8. Known limits
 
-- The model was trained on adults reading full MSA sentences. Accuracy on single words read by people with
-  dyslexia is measured by the adult pilot (`ml/pilot.py`), not yet.
-- No tolerance for Kuwaiti pronunciations yet (ق as `g`, ك as `tʃ`): the symbol set has no `g`-for-ق, and the
+- The model was trained on adults reading full MSA sentences. On single words read by four adults it matched a
+  human listener in 84% of recordings (research.md section 9). Children and readers with dyslexia are not measured yet.
+- No tolerance for dialect pronunciations yet (ق as `g`, ك as `tʃ`; in the pilot an Egyptian reader's ق as `g` was marked wrong): the symbol set has no `g`-for-ق, and the
   list in research.md section 4.1 needs a native speaker's check first.
 - Response time includes upload time; speech onset is not detected.
 - Spoken answers to story questions are not checked.

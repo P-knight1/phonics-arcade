@@ -19,8 +19,9 @@ so it can tell قَمَر from قُمَر and حَبْل from جَبْل. The re
 | Part | What it does | Status |
 |---|---|---|
 | Phoneme recognition | A wav2vec2 model fine-tuned on 79 hours of Arabic speech hears which sounds were said | 9.75% phoneme error rate on held-out speech, vs 34.2% before fine-tuning and 11.8% for the published Iqra'Eval baseline ([ml/RESULTS.md](ml/RESULTS.md)) |
-| Error profiling | Aligns what was said with the target and names the Arabic error type | Done |
+| Error profiling | Aligns what was said with the target and names the Arabic error type | Adult pilot: matched a human listener in 84% of 96 recordings and caught 83% of real errors ([docs/research.md](docs/research.md) section 9) |
 | Adaptive practice | Bayesian Knowledge Tracing estimates mastery of every sound and picks the next words | Done |
+| Reading coach | An LLM turns each scored mistake into a short explanation and tip in Arabic, and sums up each round; it never hears audio or judges right and wrong | Done (needs an LLM endpoint) |
 | Generated stories | An LLM writes short vowelized stories around the reader's weak letters and interests; unvowelized output is rejected | Done |
 
 ## Games
@@ -28,11 +29,14 @@ so it can tell قَمَر from قُمَر and حَبْل from جَبْل. The re
 | Game | The reader... | Status |
 |---|---|---|
 | Word Flash | reads a vowelized word before it disappears; display time adapts | Playable |
-| Sound Surgery | says a word with one sound removed or swapped (phonemic awareness) | Backend ready, screen in progress |
-| Story Recall | reads a generated story sentence by sentence, then answers questions | Backend ready, screen in progress |
-| Progress | sees word accuracy, sound accuracy, speed and error types over time | Backend ready, screen in progress |
+| Sound Surgery | says a word with its first syllable or last sound removed, or its first letter swapped for its dot twin (phonemic awareness) | Playable |
+| Rhythmic Reading | reads words aloud in time with a beat, in one continuous recording; scored per word for sounds and timing | Playable |
+| Story Recall | unlocks after 20 practice words; reads a story the LLM builds from their own weak letters and misread words, up to three times (repeated reading), then answers questions | Playable with an LLM endpoint |
+| Progress | sees word accuracy, sound accuracy, speed and error types over time | Done |
 
-Designed but not built: rhythmic reading, root-and-pattern games, fading vowel marks as letters are mastered,
+The interface is Arabic and right to left, with large practice text in a naskh face and wide line spacing.
+
+Designed but not built: root-and-pattern games, fading vowel marks as letters are mastered,
 tolerance for Kuwaiti pronunciations. See [docs/design.md](docs/design.md) section 8 for known limits.
 
 ## Running it
@@ -75,6 +79,21 @@ Open http://localhost:5173. Add `?debug=1` to answer by typing instead of speaki
 
 **Docker** (backend only, mock mode and typed answers): `docker compose up --build`.
 
+**Hosting** (the public demo): the root `Dockerfile` builds one image with the API, the speech runtime and the
+built frontend, served from one address (Railway, or any Docker host with HTTPS: browsers only allow the
+microphone on HTTPS). The model is not in the image. Upload `ml/models/arabic-phoneme` to a Hugging Face model repo
+and set these variables on the host:
+
+| Variable | Value |
+|---|---|
+| `ARABIC_SPEECH_MODEL` | the Hugging Face repo id of the model |
+| `HF_TOKEN` | a read-only token, if that repo is private |
+| `ANTHROPIC_API_KEY` | the LLM key for the coach and stories (set a spending limit on the account) |
+
+Mount a volume at `/data` so accounts and the downloaded model survive redeploys. Coach notes and stories are
+capped per player and per day, because each one is a paid call. When the frontend is served (`STATIC_DIR` set), the
+API reference is switched off, security headers are added, and requests are limited per address.
+
 **Tests**
 
 ```bash
@@ -90,7 +109,7 @@ backend/tests/   pytest suite
 frontend/src/    React app: shell/ (login, menu, mic, debug input), games/<game>/
 content/         vowelized word lists per game, story prompt
 ml/              phoneme model: training, evaluation, adult-pilot scoring
-docs/            design.md (how it works), research.md (the evidence)
+docs/            design.md (how it works), research.md (the evidence), pilot-consent.md
 ```
 
 ## Data and ethics

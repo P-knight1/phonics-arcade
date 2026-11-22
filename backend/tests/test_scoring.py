@@ -13,7 +13,8 @@ from app.scoring import missed_phonemes, normalize, score, single
     ("k a t", "", False, 0.0, "no_response"),
 ])
 def test_score(target, heard, correct, acc, err):
-    assert score(target.split(), heard.split()) == {"correct": correct, "phoneme_accuracy": acc, "error_type": err}
+    assert score(target.split(), heard.split()) == {"correct": correct, "phoneme_accuracy": acc, "error_type": err,
+                                                    "unclear": False}
 
 
 def test_spelling_reversal_uses_text():
@@ -104,3 +105,20 @@ def test_every_dot_letter_sound_has_a_letter_to_show():
 def test_letters_shown_for_sounds():
     from app.brain import letter
     assert [letter(p) for p in ("H", "bb", "aa", "a", "?")] == ["ح", "بّ", "ا", "الفتحة", "?"]
+
+
+def test_vowel_slipped_into_a_final_cluster_is_not_a_mistake():
+    hbl = ["H", "a", "b", "l"]
+    assert score(hbl, ["H", "a", "b", "i", "l"], "حَبْلْ")["correct"]
+    assert not score(hbl, ["H", "a", "b", "aa", "l"], "حَبْلْ")["correct"]  # a long vowel is a real change
+    assert not score(["q", "a", "l", "a", "m"], ["q", "a", "l", "a", "i", "m"], "قَلَمْ")["correct"]  # no cluster there
+
+
+def test_fit_gap_decides_close_calls():
+    target, slip = ["q", "a", "l", "a", "m"], ["q", "a", "l", "a", "n"]
+    assert score(target, slip, "قَلَمْ", gap=2.0) | {"phoneme_accuracy": 0} == {
+        "correct": True, "phoneme_accuracy": 0, "error_type": "none", "unclear": False}
+    assert (score(target, slip, "قَلَمْ", gap=5.0)["unclear"], score(target, slip, "قَلَمْ", gap=5.0)["correct"]) == (True, False)
+    assert not score(target, slip, "قَلَمْ", gap=9.0)["unclear"]
+    assert not score(target, slip, "قَلَمْ")["unclear"]  # typed answers have no gap
+    assert score(target, [], "قَلَمْ", gap=0.5)["error_type"] == "no_response"  # silence never passes

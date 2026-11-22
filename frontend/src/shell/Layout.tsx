@@ -1,6 +1,6 @@
 import { Link, Outlet } from "react-router-dom";
 import { DEBUG } from "./debug";
-import { useSession } from "./session";
+import { displayName, useSession } from "./session";
 
 export default function Layout() {
   const session = useSession();
@@ -10,16 +10,19 @@ export default function Layout() {
     <>
       <header className="topbar">
         <Link to="/" className="brand">
-          Phonics Arcade
+          <span className="brand-mark" aria-hidden="true">
+            ح
+          </span>
+          صوت الحروف
         </Link>
-        {DEBUG && <span className="badge">Debug</span>}
+        {DEBUG && <span className="badge">وضع التجربة</span>}
         <span className="spacer" />
-        <span className="who">{session.player.name}</span>
+        <span className="who">{displayName(session.player, session.guest)}</span>
         <button className="quiet" onClick={() => void session.leave()}>
-          {session.guest ? "Leave" : "Log out"}
+          {session.guest ? "مغادرة" : "تسجيل الخروج"}
         </button>
       </header>
-      {session.guest && <p className="guest-note">Guest progress isn't saved. Create an account to keep it.</p>}
+      {session.guest && <p className="guest-note">تقدّم الضيف لا يُحفظ. أنشئ حسابًا لتحتفظ به.</p>}
       <main className="page">
         <Outlet />
       </main>

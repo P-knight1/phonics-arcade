@@ -16,7 +16,7 @@ from pydantic import ValidationError
 from . import db, g2p
 from .arabic_phonemes import LETTERS, SHADDA
 from .schemas import StoryResponse
-from .scoring import missed_phonemes, single
+from .scoring import changes, missed_phonemes, single
 
 CONTENT_DIR = Path(__file__).resolve().parents[2] / "content"  # repo root locally, /content in Docker
 ROUND_SIZE = 5
@@ -34,6 +34,7 @@ def letter(p: str) -> str:
 MIN_RESULTS_TO_MOVE = 3  # don't change level on one lucky or unlucky word
 LEVEL_UP, LEVEL_DOWN = 0.8, 0.5  # word accuracy of the round just played
 MIN_VOWELIZED = 0.9  # share of letters with a vowel mark a story needs (stories are read aloud and scored)
+STORY_UNLOCK = 20  # word-game attempts before stories open: enough to know which sounds and words to target
 
 STORY_SCHEMA = {
     "type": "object",
@@ -45,10 +46,12 @@ STORY_SCHEMA = {
                 "type": "object",
                 "properties": {"q": {"type": "string"}, "answer": {"type": "string"}},
                 "required": ["q", "answer"],
+                "additionalProperties": False,
             },
         },
     },
     "required": ["story", "questions"],
+    "additionalProperties": False,
 }
 
 
@@ -57,6 +60,10 @@ class ContentMissing(Exception):
 
 
 class LLMUnavailable(Exception):
+    pass
+
+
+class StoryLocked(Exception):
     pass
 
 
@@ -105,7 +112,7 @@ def weakest(player_id: str, top: int = 2) -> list[str]:
 
 def pick_items(items: list[str], weak: list[str]) -> list[str]:
     """Words containing the player's weak sounds first, then the rest, shuffled."""
-    targeted = [w for w in items if set(weak) & set(g2p.phonemes(w))]
+    targeted = [w for w in items if set(weak) & set(g2p.phonemes(w.split("|")[-1]))]  # "prompt|answer": the answer is read
     rest = [w for w in items if w not in targeted]
     random.shuffle(targeted)
     random.shuffle(rest)
@@ -134,7 +141,33 @@ def next_exercise(player_id: str, game: str, history: list[dict]) -> dict:
             "display_ms": spec["display_ms"], "reason": reason}
 
 
-def _complete(prompt: str) -> str:
+CLAUDE_MODEL = "claude-opus-5-5"
+
+
+def _complete_claude(prompt: str, schema: dict, effort: str) -> str:
+    """Claude through the Anthropic SDK, with structured output so the reply is always JSON in `schema`."""
+    import anthropic
+
+    client = anthropic.Anthropic(timeout=90, max_retries=1)  # key from ANTHROPIC_API_KEY
+    request = {"model": os.getenv("LLM_MODEL") or CLAUDE_MODEL, "max_tokens": 16000,
+               "messages": [{"role": "user", "content": prompt}],
+               "output_config": {"effort": effort, "format": {"type": "json_schema", "schema": schema}}}
+    try:
+        try:  # on a policy decline the API retries on a fallback model inside the same call
+            resp = client.beta.messages.create(**request, betas=["server-side-fallback-2026-07-01"], fallbacks="default")
+        except anthropic.BadRequestError:  # an account or model without fallbacks: plain request
+            resp = client.messages.create(**request)
+    except anthropic.APIError as e:
+        raise LLMUnavailable(f"Claude request failed: {type(e).__name__}") from e
+    if resp.stop_reason != "end_turn":  # refusal or max_tokens: no usable JSON
+        raise LLMUnavailable(f"Claude stopped: {resp.stop_reason}")
+    return next((b.text for b in resp.content if b.type == "text"), "")
+
+
+def _complete(prompt: str, schema: dict = STORY_SCHEMA, effort: str = "medium") -> str:
+    """effort (Claude only): "low" for short coach notes, "medium" for stories."""
+    if os.getenv("ANTHROPIC_API_KEY"):
+        return _complete_claude(prompt, schema, effort)
     base_url, api_key, model = (os.getenv(k) for k in ("VLLM_BASE_URL", "VLLM_API_KEY", "VLLM_MODEL"))
     if not (base_url and model):
         raise LLMUnavailable("VLLM_BASE_URL / VLLM_MODEL are not set")
@@ -144,7 +177,7 @@ def _complete(prompt: str) -> str:
         try:
             # vLLM structured output: the model can only produce JSON in this shape.
             resp = client.chat.completions.create(
-                **request, response_format={"type": "json_schema", "json_schema": {"name": "story", "schema": STORY_SCHEMA}})
+                **request, response_format={"type": "json_schema", "json_schema": {"name": "reply", "schema": schema}})
         except BadRequestError:  # some hosted dev APIs lack schema output; the prompt asks for JSON and story() checks it
             resp = client.chat.completions.create(**request)
     except OpenAIError as e:
@@ -167,17 +200,69 @@ def _parse_story(text: str) -> dict:
         raise LLMUnavailable("LLM returned a story in the wrong shape") from e
 
 
+def story_status(player_id: str) -> dict:
+    done = db.practice_count(player_id)
+    return {"unlocked": done >= STORY_UNLOCK, "attempts": done, "needed": STORY_UNLOCK}
+
+
 def story(player_id: str, weak: list[str], interests: list[str]) -> dict:
+    if not story_status(player_id)["unlocked"]:
+        raise StoryLocked(f"stories open after {STORY_UNLOCK} attempts in the word games")
     if not weak:  # frontend doesn't know the weak sounds; the recorded attempts do
         weak = weakest(player_id)
     if not interests and (player := db.get_player(player_id)):
         interests = player["interests"]
     template = Template((CONTENT_DIR / "prompts" / "story.txt").read_text(encoding="utf-8"))
     prompt = template.safe_substitute(weak_sounds="، ".join(letter(p) for p in weak) or "أي حروف",
-                                      interests="، ".join(interests) or "الحيوانات")
+                                      interests="، ".join(interests) or "الحيوانات",
+                                      missed_words="، ".join(db.recent_mistakes(player_id)) or "لا يوجد")
     for _ in range(2):  # a story without its vowel marks can't be read by a beginner: ask once more
         result = _parse_story(_complete(prompt))
         text = result["story"] + " ".join(q["q"] + " " + q["answer"] for q in result["questions"])
         if vowelized_share(text) >= MIN_VOWELIZED:
             return result
     raise LLMUnavailable("LLM story was not fully vowelized")
+
+
+# The reading coach: an LLM explains a mistake the phoneme model found, in words a reader understands. It never
+# judges right or wrong (scoring does) and never hears audio: it gets the target text and the two phoneme
+# sequences, rewritten as letters.
+COACH_SCHEMA = {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"],
+                "additionalProperties": False}
+COACH_LIMIT = {"word": 300, "round": 600}  # characters
+ERROR_NAMES = {"none": "لا خطأ", "letter_reversal": "حرفان متبادلان", "missing_sound": "صوت ناقص",
+               "added_sound": "صوت زائد", "substitution": "صوت مختلف", "no_response": "لم يقرأ",
+               "dot_confusion": "حرفان يختلفان بالنقاط", "vowel_error": "حركة مختلفة",
+               "vowel_length": "مدّ أو قصر", "letter_position": "ترتيب الحروف"}
+BANNED = ("تشخيص", "مرض", "اضطراب", "علاج", "diagnos")  # no clinical language reaches the reader
+
+
+def what_happened(a: dict) -> str:
+    """One attempt in Arabic: 'قُرئ ح كأنه ج' rather than phoneme symbols."""
+    if a["error_type"] == "no_response":
+        return "لم يقرأ شيئًا"
+    if a["correct"]:
+        return "قرأها صحيحة"
+    t, h = a["target_phonemes"], a["heard_phonemes"]
+    swapped = [k for k in range(len(t)) if len(t) == len(h) and t[k] != h[k]]
+    if a["error_type"] == "letter_position" and len(swapped) == 2:  # the diff alone reads as add + drop
+        return f"تبادل {letter(t[swapped[0]])} و{letter(t[swapped[1]])} مكانيهما"
+    said = {"replace": "قُرئ {t} كأنه {h}", "delete": "سقط {t}", "insert": "أُضيف {h}"}
+    return "، ".join(said[tag].format(t=" ".join(map(letter, t)), h=" ".join(map(letter, h)))
+                     for tag, t, h in changes(a["target_phonemes"], a["heard_phonemes"]))
+
+
+def coach(player_id: str, kind: str, attempts: list[dict]) -> str:
+    lines = "\n".join(f"- {a['target'].split('|')[-1]}: {what_happened(a)} ({ERROR_NAMES[a['error_type']]})"
+                      for a in attempts)
+    template = Template((CONTENT_DIR / "prompts" / f"coach_{kind}.txt").read_text(encoding="utf-8"))
+    prompt = template.safe_substitute(attempts=lines,
+                                      weak_sounds="، ".join(letter(p) for p in weakest(player_id)) or "لا شيء بعد")
+    raw = _complete(prompt, COACH_SCHEMA, effort="low")
+    try:
+        text = json.loads(raw[raw.find("{"): raw.rfind("}") + 1])["text"].strip()
+    except (ValueError, KeyError, TypeError) as e:
+        raise LLMUnavailable("LLM returned coach text in the wrong shape") from e
+    if not text or len(text) > COACH_LIMIT[kind] or not g2p.is_arabic(text) or any(w in text.lower() for w in BANNED):
+        raise LLMUnavailable("LLM coach text failed the checks")
+    return text

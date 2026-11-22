@@ -50,6 +50,21 @@ def story(weak_sounds: list[str], interests: list[str]) -> dict:
     }
 
 
+def score_rhythm(texts: list[str], slot_ms: int) -> dict:
+    words = []
+    for text in texts:
+        offset = random.randint(150, slot_ms + 300)
+        words.append({**score(text, None), "target": text, "offset_ms": offset, "on_time": offset < slot_ms,
+                      "response_ms": offset})
+    return {"words": words, "steadiness_ms": random.randint(80, 400)}
+
+
+def coach(kind: str) -> dict:
+    if kind == "round":
+        return {"text": "أَحْسَنْتَ فِي أَغْلَبِ الْكَلِمَاتِ. نَتَدَرَّبُ بَعْدَ ذَلِكَ عَلَى الْحُرُوفِ الَّتِي تَخْتَلِفُ بِالنُّقَطِ."}
+    return {"text": "انْظُرْ إِلَى النُّقَطِ: الْجِيمُ لَهَا نُقْطَةٌ تَحْتَهَا، وَالْحَاءُ بِلَا نُقَطٍ."}
+
+
 def progress(player_id: str) -> dict:
     today = date.today()
     return {"sessions": [

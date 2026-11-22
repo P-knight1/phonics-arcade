@@ -33,6 +33,11 @@ def _diffs(target: list[str], heard: list[str]):
     return [op for op in SequenceMatcher(a=target, b=heard, autojunk=False).get_opcodes() if op[0] != "equal"]
 
 
+def changes(target: list[str], heard: list[str]) -> list[tuple[str, list[str], list[str]]]:
+    """[(tag, target part, heard part)] for every difference: tag is replace, delete or insert."""
+    return [(tag, target[i1:i2], heard[j1:j2]) for tag, i1, i2, j1, j2 in _diffs(target, heard)]
+
+
 def phoneme_accuracy(target: list[str], heard: list[str]) -> float:
     if not target and not heard:
         return 1.0
@@ -106,11 +111,32 @@ def _without_final_vowel(target: list[str], heard: list[str]) -> list[str]:
     return heard
 
 
-def score(target: list[str], heard: list[str], target_text: str = "", heard_text: str = "") -> dict:
+def _without_cluster_vowel(target: list[str], heard: list[str]) -> list[str]:
+    """A word ending in two consonants (حَبْلْ -> H a b l): speakers slip a short vowel between them (حَبِل).
+    That is how the cluster is said, not a reading mistake."""
+    vowels = SHORT_VOWELS | LONG_VOWELS
+    if (len(target) >= 2 and len(heard) == len(target) + 1 and not {target[-2], target[-1]} & vowels
+            and heard[-1] == target[-1] and heard[-3] == target[-2] and heard[-2] in SHORT_VOWELS):
+        return heard[:-2] + heard[-1:]
+    return heard
+
+
+# How much worse the target fits the recording than the model's own reading (speech.recognize_fit), in nats.
+# Calibrated on 300 Iqra'Eval dev recordings: at 3, 83% of right readings the model transcribed with one slip pass
+# and no one-sound misreading did; between 3 and 6 some misreadings (mostly vowels) and the rest of the slips mix,
+# so the player is asked to read again rather than told they were wrong.
+FIT_RIGHT, FIT_UNSURE = 3.0, 6.0
+
+
+def score(target: list[str], heard: list[str], target_text: str = "", heard_text: str = "",
+          gap: float | None = None) -> dict:
     if is_arabic(target_text):
-        heard = _without_final_vowel(target, heard)
+        heard = _without_cluster_vowel(target, _without_final_vowel(target, heard))
+    if heard and heard != target and gap is not None and gap <= FIT_RIGHT:
+        heard = target  # the recording fits the word: the transcript's difference is the model's slip
     return {
         "correct": heard == target,
         "phoneme_accuracy": phoneme_accuracy(target, heard),
         "error_type": error_type(target, heard, target_text, heard_text),
+        "unclear": bool(heard) and heard != target and gap is not None and gap <= FIT_UNSURE,
     }

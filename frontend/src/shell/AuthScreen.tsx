@@ -6,12 +6,12 @@ type Mode = "login" | "register";
 
 function messageFor(error: unknown, mode: Mode): string {
   if (error instanceof ApiError) {
-    if (error.status === 401) return "Wrong nickname or password.";
-    if (error.status === 409) return "That nickname is taken. Try another one.";
-    if (error.status === 422 && mode === "register") return "Check the nickname and password, then try again.";
+    if (error.status === 401) return "اسم المستخدم أو كلمة المرور غير صحيحة.";
+    if (error.status === 409) return "هذا الاسم مستخدم. جرّب اسمًا آخر.";
+    if (error.status === 422 && mode === "register") return "راجع الاسم وكلمة المرور ثم حاول مرة أخرى.";
     return error.message;
   }
-  return "Something went wrong. Try again.";
+  return "حدث خطأ. حاول مرة أخرى.";
 }
 
 export default function AuthScreen() {
@@ -39,9 +39,9 @@ export default function AuthScreen() {
     if (mode === "login") {
       void run(() => session.logIn(name, password));
     } else {
-      const list = interests.split(",").map((s) => s.trim()).filter(Boolean).slice(0, 5);
+      const list = interests.split(/[,،]/).map((s) => s.trim()).filter(Boolean).slice(0, 5);
       if (list.some((s) => s.length > 40)) {
-        setError("Each thing you like can be up to 40 characters.");
+        setError("كل اهتمام يصل إلى 40 حرفًا.");
         return;
       }
       void run(() => session.register(name, password, list));
@@ -55,22 +55,27 @@ export default function AuthScreen() {
 
   return (
     <main className="auth">
-      <h1>Phonics Arcade</h1>
-      <p className="lead">Reading practice games you play with your voice.</p>
+      <h1 className="brand">
+        <span className="brand-mark" aria-hidden="true">
+          ح
+        </span>
+        صوت الحروف
+      </h1>
+      <p className="lead">ألعاب للتدرّب على القراءة بصوتك.</p>
 
       <div className="card">
         <div className="tabs" role="tablist">
           <button role="tab" aria-selected={mode === "login"} onClick={() => switchMode("login")}>
-            Log in
+            تسجيل الدخول
           </button>
           <button role="tab" aria-selected={mode === "register"} onClick={() => switchMode("register")}>
-            Create account
+            حساب جديد
           </button>
         </div>
 
         <form onSubmit={submit}>
           <label>
-            Nickname
+            اسم المستخدم
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -80,7 +85,7 @@ export default function AuthScreen() {
             />
           </label>
           <label>
-            Password
+            كلمة المرور
             <input
               type="password"
               value={password}
@@ -90,17 +95,17 @@ export default function AuthScreen() {
               required
               autoComplete={mode === "login" ? "current-password" : "new-password"}
             />
-            {mode === "register" && <span className="hint">At least 8 characters.</span>}
+            {mode === "register" && <span className="hint">8 أحرف على الأقل.</span>}
           </label>
           {mode === "register" && (
             <label>
-              Things you like (optional)
+              ما تحبه (اختياري)
               <input
                 value={interests}
                 onChange={(e) => setInterests(e.target.value)}
-                placeholder="football, cooking, space"
+                placeholder="كرة القدم، الطبخ، الفضاء"
               />
-              <span className="hint">Up to 5, with commas between. Your stories will use them.</span>
+              <span className="hint">حتى 5، بينها فواصل. ستُستخدم في قصصك.</span>
             </label>
           )}
           {error && (
@@ -109,16 +114,16 @@ export default function AuthScreen() {
             </p>
           )}
           <button className="primary" type="submit" disabled={busy}>
-            {mode === "login" ? "Log in" : "Create account"}
+            {mode === "login" ? "دخول" : "إنشاء الحساب"}
           </button>
         </form>
       </div>
 
       <div className="card guest">
         <button className="secondary" onClick={() => void run(session.playAsGuest)} disabled={busy}>
-          Play as guest
+          العب ضيفًا
         </button>
-        <p className="hint">Guest progress isn't saved. Create an account to keep it.</p>
+        <p className="hint">تقدّم الضيف لا يُحفظ. أنشئ حسابًا لتحتفظ به.</p>
       </div>
     </main>
   );

@@ -113,6 +113,25 @@ def set_level(player_id: str, game: str, level: int) -> None:
         con.execute("INSERT OR REPLACE INTO levels (player_id, game, level) VALUES (?, ?, ?)", (player_id, game, level))
 
 
+WORD_GAMES = ("word_flash", "sound_surgery", "rhythmic_reading")  # the practice that unlocks stories
+
+
+def practice_count(player_id: str) -> int:
+    """Attempts in the word games: stories unlock once there is enough to know the player's mistakes."""
+    with connect() as con:
+        return con.execute(f"SELECT COUNT(*) FROM attempts WHERE player_id = ? AND game IN ({','.join('?' * len(WORD_GAMES))})",
+                           (player_id, *WORD_GAMES)).fetchone()[0]
+
+
+def recent_mistakes(player_id: str, limit: int = 5) -> list[str]:
+    """Real words the player misread lately, newest first (Sound Surgery answers are nonwords, so not those)."""
+    with connect() as con:
+        rows = con.execute(
+            "SELECT target FROM attempts WHERE player_id = ? AND correct = 0 AND error_type != 'no_response'"
+            " AND game IN ('word_flash', 'rhythmic_reading') ORDER BY id DESC LIMIT 50", (player_id,)).fetchall()
+    return list(dict.fromkeys(t for (t,) in rows))[:limit]
+
+
 def sessions(player_id: str, game: str | None = None) -> list[dict]:
     """One session per day: word accuracy, phoneme accuracy, mean response time, error counts (mistakes only)."""
     where, args = ("player_id = ? AND game = ?", (player_id, game)) if game else ("player_id = ?", (player_id,))

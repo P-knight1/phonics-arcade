@@ -19,19 +19,19 @@ export default function DebugPanel({ target, onAnswer, disabled }: Props) {
 
   return (
     <div className="debug-panel">
-      <p className="debug-title">Debug answers</p>
+      <p className="debug-title">إجابات التجربة</p>
       <div className="row">
         <button className="secondary" onClick={() => answer(target)} disabled={disabled}>
-          ✓ Said it right
+          ✓ قالها صحيحة
         </button>
-        {/* "Wrong" needs to know what was heard; "I missed it" is the no-answer button. */}
+        {/* "Wrong" needs to know what was heard; the skip button is the no-answer case. */}
         <button className="secondary" onClick={() => answer(typed.trim())} disabled={disabled || !typed.trim()}>
-          ✗ Said it wrong
+          ✗ قالها خطأ
         </button>
       </div>
       <label>
-        What was heard
-        <input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="bog" disabled={disabled} />
+        ما الذي سُمع (بالتشكيل)
+        <input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="جَبْلْ" disabled={disabled} />
       </label>
     </div>
   );

@@ -1,5 +1,5 @@
-/* Placeholder look until the dyslexia-friendly UI guide arrives (Content, Day 1):
-   large sans-serif text, wide spacing, off-white background, no italics, left-aligned. */
+/* Dyslexia-friendly Arabic (docs/research.md section 6): right to left, large text, generous line and word
+   spacing, off-white background, no italics. No letter-spacing: it breaks the joins between Arabic letters. */
 :root {
   --bg: #faf6ec;
   --surface: #ffffff;
@@ -12,12 +12,18 @@
   --good-bg: #e3f3e8;
   --warn: #8a4b08;
   --warn-bg: #fdefd8;
+  --shadow: 0 1px 2px rgba(60, 50, 30, 0.06), 0 4px 14px rgba(60, 50, 30, 0.07);
+  --shadow-lift: 0 2px 4px rgba(60, 50, 30, 0.08), 0 10px 24px rgba(60, 50, 30, 0.12);
+  --radius: 16px;
 
-  font-family: Verdana, "Trebuchet MS", Arial, sans-serif;
+  /* UI text in a clear sans; practice text in a naskh face whose vowel marks stay legible at size. */
+  --ui-font: "Segoe UI", Tahoma, "Noto Sans Arabic", Arial, sans-serif;
+  --read-font: "Simplified Arabic", "Noto Naskh Arabic", "Traditional Arabic", "Times New Roman", serif;
+
+  font-family: var(--ui-font);
   font-size: 20px;
-  line-height: 1.6;
-  letter-spacing: 0.03em;
-  word-spacing: 0.1em;
+  line-height: 1.8;
+  word-spacing: 0.12em;
   color: var(--text);
   background: var(--bg);
 }
@@ -76,14 +82,19 @@ i {
 button,
 .button {
   font: inherit;
-  letter-spacing: inherit;
   display: inline-block;
-  padding: 0.7rem 1.4rem;
-  border-radius: 10px;
+  padding: 0.75rem 1.6rem;
+  border-radius: 999px;
   border: 2px solid transparent;
   cursor: pointer;
   text-decoration: none;
   text-align: center;
+  transition: transform 0.12s ease, background-color 0.12s ease;
+}
+
+button:not(:disabled):active,
+.button:active {
+  transform: translateY(1px) scale(0.98);
 }
 
 button:disabled {
@@ -100,6 +111,11 @@ button:disabled {
   background: var(--accent);
   color: var(--accent-text);
   font-weight: bold;
+  box-shadow: 0 3px 0 #123a68;
+}
+
+.primary:not(:disabled):hover {
+  background: #245da0;
 }
 
 .secondary {
@@ -129,9 +145,9 @@ label {
   font-weight: bold;
 }
 
-input {
+input,
+select {
   font: inherit;
-  letter-spacing: inherit;
   display: block;
   width: 100%;
   margin-top: 0.3rem;
@@ -149,7 +165,8 @@ label .hint {
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
   padding: 1.4rem;
   margin-bottom: 1.2rem;
 }
@@ -196,9 +213,25 @@ label .hint {
 }
 
 .brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   font-weight: bold;
   color: var(--accent);
   text-decoration: none;
+}
+
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-family: var(--read-font);
+  font-size: 1.3rem;
+  line-height: 1;
 }
 
 .spacer {
@@ -235,28 +268,85 @@ label .hint {
 
 .menu {
   display: grid;
-  gap: 0.9rem;
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  gap: 1rem;
 }
 
 .menu-item {
-  display: block;
-  padding: 1.1rem 1.3rem;
+  --tone: var(--accent);
+  --tone-bg: #e1ebf7;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.1rem 1.2rem;
   background: var(--surface);
-  border: 2px solid var(--border);
-  border-radius: 14px;
+  border: 2px solid transparent;
+  border-radius: 20px;
+  box-shadow: var(--shadow);
   color: var(--text);
   text-decoration: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
 }
 
 .menu-item:hover {
-  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lift);
+  border-color: var(--tone);
+}
+
+.menu-item:last-child {
+  grid-column: 1 / -1; /* Progress: not a game, so it sits on its own row */
+}
+
+.menu-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 3.6rem;
+  height: 3.6rem;
+  border-radius: 16px;
+  background: var(--tone-bg);
+  font-size: 1.9rem;
+  line-height: 1;
 }
 
 .menu-title {
   display: block;
   font-size: 1.25rem;
   font-weight: bold;
-  color: var(--accent);
+  color: var(--tone);
+}
+
+.menu-text {
+  display: block;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.tone-sun {
+  --tone: #9a5b00;
+  --tone-bg: #fff1cc;
+}
+
+.tone-sea {
+  --tone: #0f6b73;
+  --tone-bg: #d9f2f2;
+}
+
+.tone-rose {
+  --tone: #a3324f;
+  --tone-bg: #fbe1e8;
+}
+
+.tone-leaf {
+  --tone: #2f6b2a;
+  --tone-bg: #e2f2dc;
+}
+
+.tone-sky {
+  --tone: #1d4e89;
+  --tone-bg: #e1ebf7;
 }
 
 /* Games */
@@ -282,7 +372,8 @@ label .hint {
   margin-bottom: 1.4rem;
   background: var(--surface);
   border: 2px solid var(--border);
-  border-radius: 18px;
+  border-radius: 24px;
+  box-shadow: var(--shadow);
 }
 
 .stage p {
@@ -292,6 +383,13 @@ label .hint {
 .stage.correct {
   background: var(--good-bg);
   border-color: var(--good);
+  animation: pop 0.35s ease-out;
+}
+
+@keyframes pop {
+  50% {
+    transform: scale(1.03);
+  }
 }
 
 .stage.wrong {
@@ -300,10 +398,43 @@ label .hint {
 }
 
 .word {
-  font-size: clamp(3rem, 14vw, 5.5rem);
+  font-family: var(--read-font);
+  font-size: clamp(3.2rem, 15vw, 6rem);
   font-weight: bold;
-  line-height: 1.2;
-  letter-spacing: 0.08em;
+  line-height: 1.9;
+}
+
+.prompt,
+.sentence,
+.story-text,
+.answer {
+  font-family: var(--read-font);
+  line-height: 2.2;
+  word-spacing: 0.3em;
+}
+
+.prompt {
+  font-size: clamp(1.8rem, 7vw, 2.6rem);
+  font-weight: bold;
+}
+
+.sentence {
+  font-size: clamp(1.6rem, 5.5vw, 2.3rem);
+}
+
+.story-text {
+  font-size: 1.6rem;
+  max-width: none;
+}
+
+.answer {
+  font-size: 1.6rem;
+  font-weight: bold;
+  color: var(--good);
+}
+
+.question .sentence {
+  margin-bottom: 0.6rem;
 }
 
 .hidden-word {
@@ -340,8 +471,19 @@ label .hint {
   color: var(--accent-text);
 }
 
+.mic-button {
+  box-shadow: 0 0 0 10px #e1ebf7, var(--shadow-lift);
+}
+
 .mic-button.recording {
-  background: var(--warn);
+  background: #b3261e;
+  animation: listening 1.4s ease-in-out infinite;
+}
+
+@keyframes listening {
+  50% {
+    box-shadow: 0 0 0 22px rgba(179, 38, 30, 0.15), var(--shadow-lift);
+  }
 }
 
 .debug-panel {
@@ -354,11 +496,214 @@ label .hint {
 .debug-title {
   font-size: 0.8rem;
   font-weight: bold;
-  text-transform: uppercase;
   color: var(--muted);
   margin-bottom: 0.6rem;
 }
 
 .debug-panel label {
   margin-bottom: 0;
+}
+
+/* Rhythmic Reading */
+.pulse {
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 50%;
+  background: var(--border);
+  margin-bottom: 0.5rem;
+}
+
+.pulse.beat {
+  animation: beat 0.35s ease-out;
+}
+
+@keyframes beat {
+  from {
+    background: var(--accent);
+    transform: scale(1.8);
+  }
+  to {
+    background: var(--border);
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse.beat {
+    animation: none;
+    background: var(--accent);
+  }
+
+  .stage.correct,
+  .mic-button.recording {
+    animation: none;
+  }
+
+  button,
+  .menu-item {
+    transition: none;
+  }
+
+  .menu-item:hover {
+    transform: none;
+  }
+}
+
+label.check {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-weight: normal;
+}
+
+label.check input {
+  width: auto;
+  margin: 0;
+}
+
+.rhythm-row {
+  display: grid;
+  grid-template-columns: 7rem 1fr 6rem;
+  gap: 0.8rem;
+  align-items: center;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.rhythm-row:last-child {
+  border-bottom: none;
+}
+
+.rhythm-word {
+  font-family: var(--read-font);
+  font-size: 1.6rem;
+  font-weight: bold;
+}
+
+.rhythm-row.correct .rhythm-word {
+  color: var(--good);
+}
+
+.rhythm-row.wrong .rhythm-word {
+  color: var(--warn);
+}
+
+.rhythm-time {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.reading-row {
+  display: grid;
+  grid-template-columns: 6rem 1fr 4rem;
+  gap: 0.8rem;
+  padding: 0.3rem 0;
+}
+
+/* Coach */
+.coach {
+  margin: 0 0 1.2rem;
+  padding: 0.9rem 1.1rem;
+  background: var(--surface);
+  border-inline-start: 5px solid var(--accent);
+  border-radius: 10px;
+}
+
+.coach-label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: var(--accent);
+}
+
+.coach p {
+  margin: 0;
+  font-family: var(--read-font);
+  font-size: 1.3rem;
+  line-height: 2;
+}
+
+/* Progress */
+h2 {
+  font-size: 1.25rem;
+  margin: 1.6rem 0 0.7rem;
+}
+
+label.inline {
+  max-width: 18rem;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.8rem;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  color: var(--muted);
+}
+
+.stat-value {
+  font-size: 1.8rem;
+  font-weight: bold;
+  color: var(--text);
+}
+
+.day {
+  margin-bottom: 1rem;
+}
+
+.day-title {
+  margin-bottom: 0.2rem;
+  color: var(--muted);
+}
+
+.bar-row {
+  display: grid;
+  grid-template-columns: 7.5rem 1fr 3.5rem;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.bar {
+  height: 0.9rem;
+  background: var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.bar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.bar.sound > span {
+  background: var(--good);
+}
+
+.bar.errors > span {
+  background: var(--warn);
+}
+
+.spaced {
+  margin-top: 2rem;
+}
+
+h1.brand {
+  color: var(--text);
+}
+
+h1.brand .brand-mark {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 14px;
+  font-size: 1.9rem;
 }

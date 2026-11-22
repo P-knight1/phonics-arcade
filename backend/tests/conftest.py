@@ -1,12 +1,24 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from app import main
+from app import brain, main
 
 
 @pytest.fixture(autouse=True)
 def temp_db(tmp_path, monkeypatch):
     monkeypatch.setenv("DB_PATH", str(tmp_path / "test.db"))
+
+
+@pytest.fixture(autouse=True)
+def stories_unlocked(monkeypatch):
+    """Story tests don't play 20 rounds first; test_story_unlock.py sets the real threshold."""
+    monkeypatch.setattr(brain, "STORY_UNLOCK", 0)
+
+
+@pytest.fixture(autouse=True)
+def fresh_rate_limits():
+    """Tests make far more requests from one address than a player would."""
+    main._hits.clear()
 
 
 @pytest.fixture

@@ -21,6 +21,13 @@ export interface ScoreResult {
   phoneme_accuracy: number;
   response_ms: number | null;
   error_type: ErrorType;
+  /** The model can't tell whether the word was right: ask for another reading (nothing was saved). */
+  unclear?: boolean;
+}
+
+/** A scored answer plus what the player was asked to say (the coach needs both). */
+export interface Attempt extends ScoreResult {
+  target: string;
 }
 
 export interface Exercise {
@@ -74,6 +81,7 @@ export class ApiError extends Error {
   }
 }
 
+// Empty in the production build: the backend serves the app, so requests go to the same origin.
 const BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/+$/, "");
 
 let token: string | null = null;
@@ -98,11 +106,10 @@ async function errorDetail(res: Response): Promise<string> {
   } catch {
     // not JSON: fall through
   }
-  return `Request failed (${res.status})`;
+  return `تعذّر الطلب (${res.status})`;
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  if (!BASE_URL) throw new ApiError(0, "VITE_API_BASE_URL is not set");
   const sentToken = token;
   const headers = new Headers(init.headers);
   if (sentToken) headers.set("Authorization", `Bearer ${sentToken}`);
@@ -111,7 +118,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   try {
     res = await fetch(`${BASE_URL}${path}`, { ...init, headers });
   } catch {
-    throw new ApiError(0, "Can't reach the server");
+    throw new ApiError(0, "تعذّر الوصول إلى الخادم");
   }
   if (!res.ok) {
     if (res.status === 401 && sentToken) onUnauthorized?.();
@@ -132,7 +139,11 @@ export function health(): Promise<{ ok: boolean; mock: boolean }> {
   return request("/health");
 }
 
-export function register(name: string, password: string, interests: string[]): Promise<LoginResult> {
+export function register(
+  name: string,
+  password: string,
+  interests: string[],
+): Promise<LoginResult> {
   return postJson("/players", { name, password, interests });
 }
 
@@ -162,13 +173,17 @@ export interface Answer {
   audio?: Blob;
   /** Debug answer: scored instead of audio. Leave both out when the player said nothing. */
   heardText?: string;
+  /** The reading after an unclear one: the server then always gives a verdict. */
+  secondTry?: boolean;
 }
 
 export function score(answer: Answer): Promise<ScoreResult> {
   const form = new FormData();
   form.append("target", answer.target);
   form.append("game", answer.game);
-  if (answer.shownAtMs !== undefined) form.append("shown_at_ms", String(answer.shownAtMs));
+  if (answer.shownAtMs !== undefined)
+    form.append("shown_at_ms", String(answer.shownAtMs));
+  if (answer.secondTry) form.append("second_try", "true");
   if (answer.audio) {
     // Safari records mp4, Chrome and Firefox record webm: the backend accepts both.
     const ext = answer.audio.type.includes("mp4") ? "mp4" : "webm";
@@ -179,17 +194,125 @@ export function score(answer: Answer): Promise<ScoreResult> {
   return request("/score", { method: "POST", body: form });
 }
 
+export interface RhythmWord extends Attempt {
+  /** From the moment the word appeared until the reader started it. Null for typed answers. */
+  offset_ms: number | null;
+  /** Started before the next word appeared. */
+  on_time: boolean | null;
+}
+
+export interface RhythmResult {
+  words: RhythmWord[];
+  /** Spread of the delays in ms: lower is a steadier rhythm. Null for typed answers. */
+  steadiness_ms: number | null;
+}
+
+export interface RhythmRun {
+  targets: string[];
+  slotMs: number;
+  /** When the first word appeared, in ms from the start of the recording. */
+  firstWordMs: number;
+  audio?: Blob;
+  /** Debug answer: the whole run typed, words separated by spaces. */
+  heardText?: string;
+}
+
+/** Rhythmic Reading: one recording of the whole run, scored word by word with timing. */
+export function scoreRhythm(run: RhythmRun): Promise<RhythmResult> {
+  const form = new FormData();
+  form.append("targets", JSON.stringify(run.targets));
+  form.append("slot_ms", String(Math.round(run.slotMs)));
+  form.append("first_word_ms", String(Math.round(run.firstWordMs)));
+  if (run.audio)
+    form.append(
+      "audio",
+      run.audio,
+      `run.${run.audio.type.includes("mp4") ? "mp4" : "webm"}`,
+    );
+  else if (run.heardText) form.append("heard_text", run.heardText);
+  return request("/score-rhythm", { method: "POST", body: form });
+}
+
 /** history = the /score results of the round just played (empty on the first call). */
-export function nextExercise(playerId: string, game: string, history: ScoreResult[]): Promise<Exercise> {
+export function nextExercise(
+  playerId: string,
+  game: string,
+  history: ScoreResult[],
+): Promise<Exercise> {
   return postJson("/next-exercise", { player_id: playerId, game, history });
 }
 
 /** Empty weak_sounds and interests are filled in by the server from the player's attempts and profile. */
-export function story(playerId: string, weakSounds: string[] = [], interests: string[] = []): Promise<Story> {
-  return postJson("/story", { player_id: playerId, weak_sounds: weakSounds, interests });
+export function story(
+  playerId: string,
+  weakSounds: string[] = [],
+  interests: string[] = [],
+): Promise<Story> {
+  return postJson("/story", {
+    player_id: playerId,
+    weak_sounds: weakSounds,
+    interests,
+  });
+}
+
+/** The reading coach: an LLM explains a mistake ("word") or sums up a round ("round"). 503 when unavailable. */
+export function coach(
+  playerId: string,
+  kind: "word" | "round",
+  attempts: Attempt[],
+): Promise<{ text: string }> {
+  return postJson("/coach", {
+    player_id: playerId,
+    kind,
+    attempts: attempts
+      .slice(-20)
+      .map(
+        ({ target, target_phonemes, heard_phonemes, correct, error_type }) => ({
+          target,
+          target_phonemes,
+          heard_phonemes,
+          correct,
+          error_type,
+        }),
+      ),
+  });
+}
+
+/** Stories open after enough word-game practice to know what to target. */
+export function storyStatus(
+  playerId: string,
+): Promise<{ unlocked: boolean; attempts: number; needed: number }> {
+  return request(`/story/status/${encodeURIComponent(playerId)}`);
 }
 
 export function progress(playerId: string, game?: string): Promise<Progress> {
   const query = game ? `?game=${encodeURIComponent(game)}` : "";
   return request(`/progress/${encodeURIComponent(playerId)}${query}`);
+}
+
+/** Mic check (not a game): every sound the model heard with its start in ms from the start of the recording, written
+ * back as Arabic. With a run (the words shown and when), also each word's result and timing. Nothing is saved. */
+export interface TimingTest {
+  sounds: { phoneme: string; ms: number }[];
+  heard_text: string;
+  words?: (RhythmWord & { heard_text: string })[];
+  steadiness_ms?: number | null;
+}
+
+export function timingTest(
+  audio: Blob,
+  run?: { targets: string[]; slotMs: number; firstWordMs: number },
+): Promise<TimingTest> {
+  const form = new FormData();
+  form.append(
+    "audio",
+    audio,
+    `test.${audio.type.includes("mp4") ? "mp4" : "webm"}`,
+  );
+  if (run) {
+    form.append("targets", JSON.stringify(run.targets));
+    form.append("slot_ms", String(run.slotMs));
+    form.append("first_word_ms", String(run.firstWordMs));
+  }
+  return request("/timing-test", { method: "POST", body: form });
 }
